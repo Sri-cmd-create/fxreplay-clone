@@ -129,21 +129,57 @@ export const DRAWING_COLORS = [
   '#d1d4dc',
 ];
 
-export const useStore = create<StoreState>((set, get) => ({
-  symbol: 'EURUSD',
-  timeframe: 'M15',
-  playheads: { EURUSD: initialPlayhead('EURUSD') },
-  playing: false,
-  speed: 1,
+// ── Persistence ──────────────────────────────────────────────────────────
+// The session (account, trades, orders, drawings and replay position) is saved
+// to localStorage so a browser refresh resumes exactly where you left off.
 
-  balance: STARTING_BALANCE,
-  positions: [],
-  pendingOrders: [],
-  history: [],
+const PERSIST_KEY = 'fxreplay:session:v1';
+
+/** The subset of store state that is persisted between sessions. */
+type PersistedState = Pick<
+  StoreState,
+  | 'symbol'
+  | 'timeframe'
+  | 'playheads'
+  | 'speed'
+  | 'balance'
+  | 'positions'
+  | 'pendingOrders'
+  | 'history'
+  | 'drawings'
+  | 'drawingColor'
+>;
+
+const hasStorage =
+  typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
+
+function loadPersisted(): Partial<PersistedState> {
+  if (!hasStorage) return {};
+  try {
+    const raw = window.localStorage.getItem(PERSIST_KEY);
+    return raw ? (JSON.parse(raw) as Partial<PersistedState>) : {};
+  } catch {
+    return {};
+  }
+}
+
+const saved = loadPersisted();
+
+export const useStore = create<StoreState>((set, get) => ({
+  symbol: saved.symbol ?? 'EURUSD',
+  timeframe: saved.timeframe ?? 'M15',
+  playheads: saved.playheads ?? { EURUSD: initialPlayhead('EURUSD') },
+  playing: false,
+  speed: saved.speed ?? 1,
+
+  balance: saved.balance ?? STARTING_BALANCE,
+  positions: saved.positions ?? [],
+  pendingOrders: saved.pendingOrders ?? [],
+  history: saved.history ?? [],
 
   activeTool: 'cursor',
-  drawingColor: DRAWING_COLORS[0],
-  drawings: [],
+  drawingColor: saved.drawingColor ?? DRAWING_COLORS[0],
+  drawings: saved.drawings ?? [],
   selectedDrawingId: null,
 
   setSymbol: (symbol) => {
@@ -328,6 +364,30 @@ export const useStore = create<StoreState>((set, get) => ({
     return { floatingPnl, equity, usedMargin, freeMargin, marginLevel };
   },
 }));
+
+// ── Persist on every change ──────────────────────────────────────────────
+if (hasStorage) {
+  const persist = (state: StoreState) => {
+    try {
+      const snapshot: PersistedState = {
+        symbol: state.symbol,
+        timeframe: state.timeframe,
+        playheads: state.playheads,
+        speed: state.speed,
+        balance: state.balance,
+        positions: state.positions,
+        pendingOrders: state.pendingOrders,
+        history: state.history,
+        drawings: state.drawings,
+        drawingColor: state.drawingColor,
+      };
+      window.localStorage.setItem(PERSIST_KEY, JSON.stringify(snapshot));
+    } catch {
+      /* storage full or unavailable — ignore */
+    }
+  };
+  useStore.subscribe(persist);
+}
 
 // ── Helpers operating on a snapshot of the store ─────────────────────────
 

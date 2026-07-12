@@ -1,8 +1,10 @@
+import { useState } from 'react';
 import { useStore } from '../store/useStore';
 import { getBaseCandles } from '../lib/data';
 import { getInstrument } from '../lib/instruments';
 import { formatMoney, formatPrice, formatSignedNumber } from '../lib/format';
 import { pipsGained, profit } from '../lib/trading';
+import type { Position } from '../types';
 import { CloseIcon } from './icons';
 
 export function PositionsPanel() {
@@ -71,11 +73,11 @@ export function PositionsPanel() {
                 <Td className="text-right font-mono">
                   {formatPrice(price, instrument.digits)}
                 </Td>
-                <Td className="text-right font-mono text-down">
-                  {pos.sl != null ? formatPrice(pos.sl, instrument.digits) : '—'}
+                <Td className="text-right">
+                  <EditableStop pos={pos} field="sl" digits={instrument.digits} />
                 </Td>
-                <Td className="text-right font-mono text-up">
-                  {pos.tp != null ? formatPrice(pos.tp, instrument.digits) : '—'}
+                <Td className="text-right">
+                  <EditableStop pos={pos} field="tp" digits={instrument.digits} />
                 </Td>
                 <Td className={`text-right font-mono ${tone}`}>
                   {formatSignedNumber(pips, 1)}
@@ -98,6 +100,67 @@ export function PositionsPanel() {
         </tbody>
       </table>
     </div>
+  );
+}
+
+/** Inline-editable stop-loss / take-profit cell. */
+function EditableStop({
+  pos,
+  field,
+  digits,
+}: {
+  pos: Position;
+  field: 'sl' | 'tp';
+  digits: number;
+}) {
+  const modifyPosition = useStore((s) => s.modifyPosition);
+  const [editing, setEditing] = useState(false);
+  const [val, setVal] = useState('');
+  const current = pos[field];
+  const color = field === 'sl' ? 'text-down' : 'text-up';
+
+  const begin = () => {
+    setVal(current != null ? String(current) : '');
+    setEditing(true);
+  };
+  const commit = () => {
+    const trimmed = val.trim();
+    const num = trimmed === '' ? null : Number(trimmed);
+    const value = num != null && Number.isFinite(num) && num > 0 ? num : null;
+    modifyPosition(
+      pos.id,
+      field === 'sl' ? value : pos.sl,
+      field === 'tp' ? value : pos.tp,
+    );
+    setEditing(false);
+  };
+
+  if (editing) {
+    return (
+      <input
+        autoFocus
+        type="number"
+        step={Math.pow(10, -digits)}
+        value={val}
+        placeholder="—"
+        onChange={(e) => setVal(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') commit();
+          else if (e.key === 'Escape') setEditing(false);
+        }}
+        className="h-6 w-20 rounded bg-panel-alt px-1 text-right font-mono text-xs text-white outline-none ring-1 ring-accent"
+      />
+    );
+  }
+  return (
+    <button
+      onClick={begin}
+      title="Click to edit"
+      className={`font-mono ${color} hover:underline`}
+    >
+      {current != null ? formatPrice(current, digits) : '—'}
+    </button>
   );
 }
 

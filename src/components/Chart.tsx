@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ColorType,
   CrosshairMode,
@@ -8,6 +8,7 @@ import {
   type IChartApi,
   type IPriceLine,
   type ISeriesApi,
+  type MouseEventParams,
   type SeriesMarker,
   type Time,
   type UTCTimestamp,
@@ -38,6 +39,8 @@ export function Chart() {
   const dataKeyRef = useRef<string>('');
   const prevLenRef = useRef<number>(0);
 
+  const [chartReady, setChartReady] = useState(false);
+
   const symbol = useStore((s) => s.symbol);
   const timeframe = useStore((s) => s.timeframe);
   const playhead = useStore((s) => s.playheads[s.symbol] ?? 0);
@@ -45,7 +48,8 @@ export function Chart() {
   const pendingOrders = useStore((s) => s.pendingOrders);
 
   const instrument = getInstrument(symbol);
-  const tfMinutes = TIMEFRAME_MAP[timeframe].minutes;
+  const tf = TIMEFRAME_MAP[timeframe];
+  const tfMinutes = tf.minutes;
 
   // Aggregate only the revealed portion of the base series for the timeframe.
   const visible = useMemo(() => {
@@ -89,6 +93,7 @@ export function Chart() {
 
     chartRef.current = chart;
     seriesRef.current = series;
+    setChartReady(true);
 
     return () => {
       chart.remove();
@@ -97,6 +102,7 @@ export function Chart() {
       priceLinesRef.current = [];
       dataKeyRef.current = '';
       prevLenRef.current = 0;
+      setChartReady(false);
     };
   }, []);
 
@@ -246,12 +252,22 @@ export function Chart() {
   }, [positions, pendingOrders, symbol, tfMinutes]);
 
   const firstTime = visible[0]?.time ?? 0;
+  const lastCandle = visible[visible.length - 1] ?? null;
 
   return (
     <div className="flex h-full w-full">
       <DrawingToolbar />
       <div className="relative min-w-0 flex-1">
         <div ref={containerRef} className="h-full w-full" />
+        <ChartLegend
+          chartRef={chartRef}
+          seriesRef={seriesRef}
+          ready={chartReady}
+          symbol={symbol}
+          timeframeLabel={tf.label}
+          digits={instrument.digits}
+          fallback={lastCandle}
+        />
         <DrawingLayer
           chartRef={chartRef}
           seriesRef={seriesRef}
@@ -261,6 +277,89 @@ export function Chart() {
           probePrice={instrument.basePrice}
         />
       </div>
+    </div>
+  );
+}
+
+// ── Live OHLC legend (top-left), following the crosshair ─────────────────
+
+interface OHLC {
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+}
+
+function ChartLegend({
+  chartRef,
+  seriesRef,
+  ready,
+  symbol,
+  timeframeLabel,
+  digits,
+  fallback,
+}: {
+  chartRef: React.RefObject<IChartApi | null>;
+  seriesRef: React.RefObject<ISeriesApi<'Candlestick'> | null>;
+  ready: boolean;
+  symbol: string;
+  timeframeLabel: string;
+  digits: number;
+  fallback: Candle | null;
+}) {
+  const [hover, setHover] = useState<OHLC | null>(null);
+
+  useEffect(() => {
+    const chart = chartRef.current;
+    const series = seriesRef.current;
+    if (!ready || !chart || !series) return;
+
+    const handler = (param: MouseEventParams) => {
+      const d = param.seriesData.get(series) as CandlestickData | undefined;
+      if (d && typeof d.open === 'number') {
+        setHover({ open: d.open, high: d.high, low: d.low, close: d.close });
+      } else {
+        setHover(null);
+      }
+    };
+    chart.subscribeCrosshairMove(handler);
+    return () => chart.unsubscribeCrosshairMove(handler);
+  }, [chartRef, seriesRef, ready]);
+
+  const bar: OHLC | null = hover ?? fallback;
+  if (!bar) return null;
+
+  const up = bar.close >= bar.open;
+  const color = up ? '#26a69a' : '#ef5350';
+  const change = bar.close - bar.open;
+  const pct = bar.open ? (change / bar.open) * 100 : 0;
+  const fmt = (v: number) =>
+    v.toLocaleString('en-US', {
+      minimumFractionDigits: digits,
+      maximumFractionDigits: digits,
+    });
+
+  return (
+    <div className="pointer-events-none absolute left-2 top-2 z-10 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px]">
+      <span className="text-sm font-semibold text-white">{symbol}</span>
+      <span className="text-muted">{timeframeLabel}</span>
+      <span className="font-mono text-muted">
+        O <span style={{ color }}>{fmt(bar.open)}</span>
+      </span>
+      <span className="font-mono text-muted">
+        H <span style={{ color }}>{fmt(bar.high)}</span>
+      </span>
+      <span className="font-mono text-muted">
+        L <span style={{ color }}>{fmt(bar.low)}</span>
+      </span>
+      <span className="font-mono text-muted">
+        C <span style={{ color }}>{fmt(bar.close)}</span>
+      </span>
+      <span className="font-mono" style={{ color }}>
+        {change >= 0 ? '+' : ''}
+        {fmt(change)} ({pct >= 0 ? '+' : ''}
+        {pct.toFixed(2)}%)
+      </span>
     </div>
   );
 }

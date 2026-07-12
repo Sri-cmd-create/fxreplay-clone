@@ -1,4 +1,5 @@
 import {
+  memo,
   useEffect,
   useReducer,
   useRef,
@@ -28,7 +29,7 @@ interface Props {
   probePrice: number;
 }
 
-export function DrawingLayer({
+function DrawingLayerImpl({
   chartRef,
   seriesRef,
   firstTime,
@@ -233,6 +234,8 @@ export function DrawingLayer({
     </div>
   );
 }
+
+export const DrawingLayer = memo(DrawingLayerImpl);
 
 // ── Individual drawing renderer ──────────────────────────────────────────
 

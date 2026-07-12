@@ -5,9 +5,11 @@ import { OrderPanel } from './components/OrderPanel';
 import { StatsPanel } from './components/StatsPanel';
 import { BottomPanel } from './components/BottomPanel';
 import { useReplayLoop } from './hooks/useReplayLoop';
+import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 
 export default function App() {
   useReplayLoop();
+  useKeyboardShortcuts();
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-[#0c0e15]">
