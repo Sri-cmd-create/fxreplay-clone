@@ -172,8 +172,16 @@ function DrawingLayerImpl({
   return (
     <div
       ref={overlayRef}
-      className="absolute inset-0"
-      style={{ pointerEvents: 'none' }}
+      className="absolute inset-0 z-20"
+      // In draw mode the overlay itself captures pointer events (reliable
+      // across browsers); in cursor mode it is transparent so the chart can
+      // pan/zoom, while individual shapes still opt in to selection.
+      style={{
+        pointerEvents: isDrawMode ? 'auto' : 'none',
+        cursor: isDrawMode ? 'crosshair' : undefined,
+      }}
+      onPointerDown={isDrawMode ? onCapturePointerDown : undefined}
+      onPointerMove={isDrawMode ? onCapturePointerMove : undefined}
     >
       {ready && (
         <svg
@@ -216,19 +224,6 @@ function DrawingLayerImpl({
             />
           )}
 
-          {/* Transparent capture surface while a drawing tool is active. */}
-          {isDrawMode && (
-            <rect
-              x={0}
-              y={0}
-              width={size.w}
-              height={size.h}
-              fill="transparent"
-              style={{ pointerEvents: 'all', cursor: 'crosshair' }}
-              onPointerDown={onCapturePointerDown}
-              onPointerMove={onCapturePointerMove}
-            />
-          )}
         </svg>
       )}
     </div>
