@@ -46,3 +46,69 @@ export function CloseIcon(props: SVGProps<SVGSVGElement>) {
     </svg>
   );
 }
+
+
+export function CursorIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M5 3l15 8-6.5 1.5L10 19z" />
+    </svg>
+  );
+}
+
+export function TrendlineIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M4 20L20 4" stroke="currentColor" strokeWidth="2" fill="none" />
+      <circle cx="4" cy="20" r="2.5" />
+      <circle cx="20" cy="4" r="2.5" />
+    </svg>
+  );
+}
+
+export function HorizontalIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M2 12h20" stroke="currentColor" strokeWidth="2" fill="none" />
+      <circle cx="12" cy="12" r="2.5" />
+    </svg>
+  );
+}
+
+export function RectangleIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base} {...props}>
+      <rect
+        x="4"
+        y="6"
+        width="16"
+        height="12"
+        rx="1"
+        stroke="currentColor"
+        strokeWidth="2"
+        fill="none"
+      />
+    </svg>
+  );
+}
+
+export function FibIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base} {...props}>
+      <g stroke="currentColor" strokeWidth="2">
+        <path d="M3 5h18" />
+        <path d="M3 10h18" opacity="0.75" />
+        <path d="M3 15h18" opacity="0.5" />
+        <path d="M3 20h18" opacity="0.35" />
+      </g>
+    </svg>
+  );
+}
+
+export function TrashIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M9 3h6l1 2h4v2H4V5h4l1-2zM6 9h12l-1 12H7L6 9z" />
+    </svg>
+  );
+}

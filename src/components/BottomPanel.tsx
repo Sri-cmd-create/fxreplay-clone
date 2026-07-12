@@ -1,13 +1,15 @@
 import { useState } from 'react';
 import { useStore } from '../store/useStore';
 import { PositionsPanel } from './PositionsPanel';
+import { PendingPanel } from './PendingPanel';
 import { HistoryPanel } from './HistoryPanel';
 
-type Tab = 'positions' | 'history';
+type Tab = 'positions' | 'pending' | 'history';
 
 export function BottomPanel() {
   const [tab, setTab] = useState<Tab>('positions');
   const openCount = useStore((s) => s.positions.length);
+  const pendingCount = useStore((s) => s.pendingOrders.length);
   const historyCount = useStore((s) => s.history.length);
 
   return (
@@ -20,6 +22,12 @@ export function BottomPanel() {
           count={openCount}
         />
         <TabButton
+          active={tab === 'pending'}
+          onClick={() => setTab('pending')}
+          label="Pending Orders"
+          count={pendingCount}
+        />
+        <TabButton
           active={tab === 'history'}
           onClick={() => setTab('history')}
           label="History"
@@ -27,7 +35,9 @@ export function BottomPanel() {
         />
       </div>
       <div className="min-h-0 flex-1">
-        {tab === 'positions' ? <PositionsPanel /> : <HistoryPanel />}
+        {tab === 'positions' && <PositionsPanel />}
+        {tab === 'pending' && <PendingPanel />}
+        {tab === 'history' && <HistoryPanel />}
       </div>
     </div>
   );
@@ -57,9 +67,7 @@ function TabButton({
           {count}
         </span>
       )}
-      {active && (
-        <span className="absolute inset-x-0 bottom-0 h-0.5 bg-accent" />
-      )}
+      {active && <span className="absolute inset-x-0 bottom-0 h-0.5 bg-accent" />}
     </button>
   );
 }

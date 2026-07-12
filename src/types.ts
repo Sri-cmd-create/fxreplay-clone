@@ -59,6 +59,33 @@ export interface Instrument {
   leverage: number;
 }
 
+/** Order execution style. */
+export type OrderType = 'market' | 'limit' | 'stop';
+
+/**
+ * A resting pending order that fills automatically once price reaches its
+ * trigger. Combined with `side`:
+ *  - buy limit  → trigger below current price
+ *  - sell limit → trigger above current price
+ *  - buy stop   → trigger above current price
+ *  - sell stop  → trigger below current price
+ */
+export interface PendingOrder {
+  id: string;
+  symbol: string;
+  side: Side;
+  /** 'limit' or 'stop' — market orders never rest as pending. */
+  type: Exclude<OrderType, 'market'>;
+  lots: number;
+  /** Trigger (activation) price. */
+  price: number;
+  /** Stop-loss / take-profit that will attach to the position once filled. */
+  sl: number | null;
+  tp: number | null;
+  /** UNIX seconds when the order was placed. */
+  createdTime: number;
+}
+
 /** Why a position was closed. */
 export type CloseReason = 'manual' | 'sl' | 'tp';
 
@@ -104,4 +131,39 @@ export interface AccountStats {
   bestTrade: number;
   worstTrade: number;
   maxDrawdown: number;
+}
+
+
+// ── Chart drawings ─────────────────────────────────────────────────────
+
+/** The currently selected charting tool. `cursor` = no drawing. */
+export type DrawingTool =
+  | 'cursor'
+  | 'trendline'
+  | 'horizontal'
+  | 'rectangle'
+  | 'fib';
+
+/** A single anchor point in chart space (timeframe-independent). */
+export interface Point {
+  /** UNIX seconds (UTC). */
+  time: number;
+  price: number;
+}
+
+/** Concrete drawing kinds (everything except the cursor). */
+export type DrawingType = Exclude<DrawingTool, 'cursor'>;
+
+/**
+ * A persisted chart drawing. Anchors are stored in (time, price) space so they
+ * remain correct across timeframe changes and chart scrolling/zooming.
+ *  - horizontal: 1 point (only `price` is used)
+ *  - trendline / rectangle / fib: 2 points
+ */
+export interface Drawing {
+  id: string;
+  symbol: string;
+  type: DrawingType;
+  points: Point[];
+  color: string;
 }

@@ -2,6 +2,9 @@ import { create } from 'zustand';
 import type {
   Candle,
   ClosedTrade,
+  Drawing,
+  DrawingTool,
+  PendingOrder,
   Position,
   Side,
   TimeframeCode,
@@ -9,6 +12,7 @@ import type {
 import { getBaseCandles } from '../lib/data';
 import { getInstrument, TIMEFRAME_MAP } from '../lib/instruments';
 import {
+  detectPendingTrigger,
   detectStopFill,
   profit,
   pipsGained,
@@ -43,7 +47,14 @@ interface StoreState {
   // ── Account ────────────────────────────────────────────────────────
   balance: number;
   positions: Position[];
+  pendingOrders: PendingOrder[];
   history: ClosedTrade[];
+
+  // ── Drawings ───────────────────────────────────────────────────────
+  activeTool: DrawingTool;
+  drawingColor: string;
+  drawings: Drawing[];
+  selectedDrawingId: string | null;
 
   // ── Actions ────────────────────────────────────────────────────────
   setSymbol: (symbol: string) => void;
@@ -68,7 +79,25 @@ interface StoreState {
   closePosition: (id: string) => void;
   closeAll: () => void;
   modifyPosition: (id: string, sl: number | null, tp: number | null) => void;
+  placePendingOrder: (
+    side: Side,
+    type: 'limit' | 'stop',
+    lots: number,
+    price: number,
+    sl: number | null,
+    tp: number | null,
+  ) => void;
+  cancelOrder: (id: string) => void;
+  cancelAllPending: () => void;
   resetAccount: () => void;
+
+  // ── Drawing actions ────────────────────────────────────────────────
+  setActiveTool: (tool: DrawingTool) => void;
+  setDrawingColor: (color: string) => void;
+  addDrawing: (drawing: Omit<Drawing, 'id' | 'symbol'>) => void;
+  removeDrawing: (id: string) => void;
+  selectDrawing: (id: string | null) => void;
+  clearDrawings: () => void;
 
   // ── Selectors ──────────────────────────────────────────────────────
   baseCandles: () => Candle[];
@@ -85,10 +114,20 @@ function initialPlayhead(symbol: string): number {
 }
 
 let idCounter = 0;
-function nextId(): string {
+function nextId(prefix = 'pos'): string {
   idCounter += 1;
-  return `pos-${Date.now().toString(36)}-${idCounter}`;
+  return `${prefix}-${Date.now().toString(36)}-${idCounter}`;
 }
+
+/** Default palette for new drawings. */
+export const DRAWING_COLORS = [
+  '#2962ff',
+  '#f0b90b',
+  '#26a69a',
+  '#ef5350',
+  '#ab47bc',
+  '#d1d4dc',
+];
 
 export const useStore = create<StoreState>((set, get) => ({
   symbol: 'EURUSD',
@@ -99,7 +138,13 @@ export const useStore = create<StoreState>((set, get) => ({
 
   balance: STARTING_BALANCE,
   positions: [],
+  pendingOrders: [],
   history: [],
+
+  activeTool: 'cursor',
+  drawingColor: DRAWING_COLORS[0],
+  drawings: [],
+  selectedDrawingId: null,
 
   setSymbol: (symbol) => {
     const state = get();
@@ -134,12 +179,13 @@ export const useStore = create<StoreState>((set, get) => ({
   },
 
   restartSession: () => {
-    const { symbol, positions } = get();
+    const { symbol, positions, pendingOrders } = get();
     set({
       playheads: { ...get().playheads, [symbol]: initialPlayhead(symbol) },
       playing: false,
-      // Positions on this symbol are abandoned when the session restarts.
+      // Positions and resting orders on this symbol are abandoned on restart.
       positions: positions.filter((p) => p.symbol !== symbol),
+      pendingOrders: pendingOrders.filter((o) => o.symbol !== symbol),
     });
   },
 
@@ -195,8 +241,60 @@ export const useStore = create<StoreState>((set, get) => ({
     });
   },
 
+  placePendingOrder: (side, type, lots, price, sl, tp) => {
+    const { symbol, currentTime, pendingOrders } = get();
+    const order: PendingOrder = {
+      id: nextId('ord'),
+      symbol,
+      side,
+      type,
+      lots,
+      price,
+      sl,
+      tp,
+      createdTime: currentTime(),
+    };
+    set({ pendingOrders: [...pendingOrders, order] });
+  },
+
+  cancelOrder: (id) =>
+    set({ pendingOrders: get().pendingOrders.filter((o) => o.id !== id) }),
+
+  cancelAllPending: () => set({ pendingOrders: [] }),
+
   resetAccount: () =>
-    set({ balance: STARTING_BALANCE, positions: [], history: [] }),
+    set({
+      balance: STARTING_BALANCE,
+      positions: [],
+      pendingOrders: [],
+      history: [],
+    }),
+
+  // ── Drawing actions ────────────────────────────────────────────────
+  setActiveTool: (tool) =>
+    set({ activeTool: tool, selectedDrawingId: null }),
+  setDrawingColor: (color) => set({ drawingColor: color }),
+  addDrawing: (drawing) =>
+    set({
+      drawings: [
+        ...get().drawings,
+        { ...drawing, id: nextId('draw'), symbol: get().symbol },
+      ],
+    }),
+  removeDrawing: (id) =>
+    set({
+      drawings: get().drawings.filter((d) => d.id !== id),
+      selectedDrawingId:
+        get().selectedDrawingId === id ? null : get().selectedDrawingId,
+    }),
+  selectDrawing: (id) => set({ selectedDrawingId: id }),
+  clearDrawings: () => {
+    const { symbol, drawings } = get();
+    set({
+      drawings: drawings.filter((d) => d.symbol !== symbol),
+      selectedDrawingId: null,
+    });
+  },
 
   // ── Selectors ──────────────────────────────────────────────────────
   baseCandles: () => getBaseCandles(getInstrument(get().symbol)),
@@ -267,12 +365,46 @@ function advance(
   }
 
   let positions = state.positions;
+  let pendingOrders = state.pendingOrders;
   let history = state.history;
   let balance = state.balance;
   const instrument = getInstrument(symbol);
 
   for (let i = start + 1; i <= end; i++) {
     const candle = candles[i];
+
+    // 1. Trigger any resting pending orders touched by this candle. A filled
+    //    order becomes an open position at its trigger price.
+    if (pendingOrders.some((o) => o.symbol === symbol)) {
+      const stillPending: PendingOrder[] = [];
+      for (const order of pendingOrders) {
+        if (order.symbol !== symbol) {
+          stillPending.push(order);
+          continue;
+        }
+        const fillPrice = detectPendingTrigger(order, candle.high, candle.low);
+        if (fillPrice != null) {
+          positions = [
+            ...positions,
+            {
+              id: nextId(),
+              symbol: order.symbol,
+              side: order.side,
+              lots: order.lots,
+              entryPrice: fillPrice,
+              entryTime: candle.time,
+              sl: order.sl,
+              tp: order.tp,
+            },
+          ];
+        } else {
+          stillPending.push(order);
+        }
+      }
+      pendingOrders = stillPending;
+    }
+
+    // 2. Check SL/TP on all open positions (including any just filled above).
     const remaining: Position[] = [];
     for (const pos of positions) {
       if (pos.symbol !== symbol) {
@@ -302,6 +434,7 @@ function advance(
   set({
     playheads: { ...state.playheads, [symbol]: end },
     positions,
+    pendingOrders,
     history,
     balance,
     playing: end >= candles.length - 1 ? false : state.playing,

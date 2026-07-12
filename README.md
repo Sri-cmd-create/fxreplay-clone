@@ -16,8 +16,10 @@ is reproducible and works fully offline.
 - **Replay engine** — play / pause, step one bar at a time, restart the session, and adjustable playback speed (0.5× → 25× bars per second).
 - **Multiple timeframes** — M1, M5, M15, M30, H1, H4, D1. The finest 1-minute data is aggregated up on demand, so higher timeframes form a live "in-progress" bar as replay advances.
 - **Multiple instruments** — EURUSD, GBPUSD, AUDUSD, XAUUSD (Gold), BTCUSD, each with its own realistic price behaviour and its own independent replay clock.
-- **Order ticket** — market buy/sell with configurable volume (lots), stop-loss and take-profit set in pips, plus live pip value, required margin, risk, reward and R:R.
-- **Simulated execution** — stop-loss / take-profit orders are checked against each 1-minute candle's high/low as replay progresses and fill automatically at bar-level granularity (the standard pessimistic backtest assumption: if both SL and TP fall inside one candle, the stop fills first).
+- **Order ticket** — **market, limit and stop** orders with configurable volume (lots), stop-loss and take-profit set in pips, plus live pip value, required margin, risk, reward and R:R.
+- **Pending orders** — buy/sell **limit** and **stop** orders rest on the book and fill automatically when replay price reaches the trigger; each order's SL/TP attaches to the resulting position. A dedicated *Pending Orders* tab lists them with live distance-to-trigger and one-click cancel. Trigger lines are drawn on the chart.
+- **Simulated execution** — pending triggers and stop-loss / take-profit orders are checked against each 1-minute candle's high/low as replay progresses and fill automatically at bar-level granularity (the standard pessimistic backtest assumption: if both SL and TP fall inside one candle, the stop fills first).
+- **Chart drawing tools** — a left tool rail with **trend line, horizontal line, rectangle and Fibonacci retracement**, a colour palette, click-to-select, and delete (via the on-shape badge or the `Delete` key; `Esc` cancels). Drawings are anchored in (time, price) space, so they stay pinned correctly across timeframe changes, scrolling and zooming.
 - **Account model** — balance, equity, floating P&L, used/free margin and margin level, using leverage-aware margin math.
 - **Open positions** panel with live P&L / pips and one-click close (or close-all).
 - **Trade journal** with realised P&L, exit reason (manual / SL / TP) and timestamps.
@@ -91,9 +93,10 @@ src/
     trading.ts            # P&L, pips, margin, SL/TP fills, stats
     random.ts             # deterministic PRNG helpers
     format.ts             # price/money/time formatting
-  store/useStore.ts       # Zustand store: replay engine + trading sim
+  store/useStore.ts       # Zustand store: replay engine + trading sim + drawings
   components/             # Chart, Toolbar, AccountBar, OrderPanel,
-                          # PositionsPanel, HistoryPanel, StatsPanel, ...
+                          # PositionsPanel, PendingPanel, HistoryPanel, StatsPanel,
+                          # DrawingToolbar, DrawingLayer, ...
 scripts/smoke.ts          # headless runtime smoke test for the engine
 ```
 

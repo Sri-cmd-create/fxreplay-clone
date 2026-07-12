@@ -17,6 +17,8 @@ import { getBaseCandles } from '../lib/data';
 import { getInstrument, TIMEFRAME_MAP } from '../lib/instruments';
 import { aggregate } from '../lib/timeframe';
 import type { Candle } from '../types';
+import { DrawingToolbar } from './DrawingToolbar';
+import { DrawingLayer } from './DrawingLayer';
 
 function toSeriesData(candles: Candle[]): CandlestickData[] {
   return candles.map((c) => ({
@@ -40,6 +42,7 @@ export function Chart() {
   const timeframe = useStore((s) => s.timeframe);
   const playhead = useStore((s) => s.playheads[s.symbol] ?? 0);
   const positions = useStore((s) => s.positions);
+  const pendingOrders = useStore((s) => s.pendingOrders);
 
   const instrument = getInstrument(symbol);
   const tfMinutes = TIMEFRAME_MAP[timeframe].minutes;
@@ -198,9 +201,66 @@ export function Chart() {
       });
     }
 
+    // Resting pending orders: a dotted trigger line (+ their SL/TP).
+    for (const o of pendingOrders) {
+      if (o.symbol !== symbol) continue;
+      const isBuy = o.side === 'buy';
+      priceLinesRef.current.push(
+        series.createPriceLine({
+          price: o.price,
+          color: isBuy ? '#26a69a' : '#ef5350',
+          lineWidth: 1,
+          lineStyle: LineStyle.Dotted,
+          axisLabelVisible: true,
+          title: `${o.side.toUpperCase()} ${o.type.toUpperCase()} ${o.lots}`,
+        }),
+      );
+      if (o.sl != null) {
+        priceLinesRef.current.push(
+          series.createPriceLine({
+            price: o.sl,
+            color: '#ef5350',
+            lineWidth: 1,
+            lineStyle: LineStyle.Dotted,
+            axisLabelVisible: false,
+            title: 'SL',
+          }),
+        );
+      }
+      if (o.tp != null) {
+        priceLinesRef.current.push(
+          series.createPriceLine({
+            price: o.tp,
+            color: '#26a69a',
+            lineWidth: 1,
+            lineStyle: LineStyle.Dotted,
+            axisLabelVisible: false,
+            title: 'TP',
+          }),
+        );
+      }
+    }
+
     markers.sort((a, b) => (a.time as number) - (b.time as number));
     series.setMarkers(markers);
-  }, [positions, symbol, tfMinutes]);
+  }, [positions, pendingOrders, symbol, tfMinutes]);
 
-  return <div ref={containerRef} className="h-full w-full" />;
+  const firstTime = visible[0]?.time ?? 0;
+
+  return (
+    <div className="flex h-full w-full">
+      <DrawingToolbar />
+      <div className="relative min-w-0 flex-1">
+        <div ref={containerRef} className="h-full w-full" />
+        <DrawingLayer
+          chartRef={chartRef}
+          seriesRef={seriesRef}
+          firstTime={firstTime}
+          tfSeconds={tfMinutes * 60}
+          digits={instrument.digits}
+          probePrice={instrument.basePrice}
+        />
+      </div>
+    </div>
+  );
 }

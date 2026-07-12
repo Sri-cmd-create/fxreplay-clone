@@ -56,4 +56,35 @@ console.log('derived:', JSON.stringify({ eq: d.equity.toFixed(2), fm: d.freeMarg
 assert(d.usedMargin > 0, 'used margin > 0 with an open position');
 assert(Math.abs(d.equity - (useStore.getState().balance + d.floatingPnl)) < 1e-6, 'equity = balance + floating P&L');
 
+// 5. Pending limit/stop orders
+store.resetAccount();
+store.restartSession();
+const p0 = useStore.getState().currentPrice();
+store.placePendingOrder('buy', 'stop', 1, p0 + eur.pipSize * 10, null, null);
+store.placePendingOrder('buy', 'limit', 1, p0 - eur.pipSize * 10, null, null);
+assert(useStore.getState().pendingOrders.length === 2, 'two pending orders placed');
+
+let filledAny = false;
+for (let i = 0; i < 3000 && useStore.getState().pendingOrders.length > 0; i++) {
+  const before = useStore.getState().positions.length;
+  useStore.getState().stepForward();
+  if (useStore.getState().positions.length > before) filledAny = true;
+}
+console.log(
+  'pending remaining:', useStore.getState().pendingOrders.length,
+  'positions:', useStore.getState().positions.length,
+);
+assert(filledAny, 'at least one pending order triggered into a position during replay');
+
+// 6. Drawings CRUD
+store.addDrawing({
+  type: 'trendline',
+  points: [{ time: p0, price: 1.1 }, { time: p0 + 3600, price: 1.12 }],
+  color: '#2962ff',
+});
+assert(useStore.getState().drawings.length === 1, 'drawing added');
+const drawId = useStore.getState().drawings[0].id;
+store.removeDrawing(drawId);
+assert(useStore.getState().drawings.length === 0, 'drawing removed');
+
 console.log('\nALL SMOKE TESTS PASSED');

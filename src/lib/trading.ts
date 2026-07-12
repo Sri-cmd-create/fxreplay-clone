@@ -2,6 +2,7 @@ import type {
   AccountStats,
   ClosedTrade,
   Instrument,
+  PendingOrder,
   Position,
   Side,
 } from '../types';
@@ -73,6 +74,58 @@ export function detectStopFill(
     if (slHit) return { price: pos.sl as number, reason: 'sl' };
     if (tpHit) return { price: pos.tp as number, reason: 'tp' };
   }
+  return null;
+}
+
+/**
+ * Determine whether a pending order's trigger price was touched by a candle's
+ * range. Returns the fill price (the trigger price — slippage is ignored) when
+ * triggered, otherwise null.
+ *
+ *  - buy limit:  fills when price falls to/through the trigger (low <= price)
+ *  - sell limit: fills when price rises to/through the trigger (high >= price)
+ *  - buy stop:   fills when price rises to/through the trigger (high >= price)
+ *  - sell stop:  fills when price falls to/through the trigger (low <= price)
+ */
+export function detectPendingTrigger(
+  order: PendingOrder,
+  high: number,
+  low: number,
+): number | null {
+  const risesTo = high >= order.price;
+  const fallsTo = low <= order.price;
+  if (order.side === 'buy') {
+    if (order.type === 'limit' && fallsTo) return order.price;
+    if (order.type === 'stop' && risesTo) return order.price;
+  } else {
+    if (order.type === 'limit' && risesTo) return order.price;
+    if (order.type === 'stop' && fallsTo) return order.price;
+  }
+  return null;
+}
+
+/**
+ * Validate that a pending order's trigger price sits on the correct side of the
+ * current market price for its side/type. Returns null when valid, or a short
+ * human-readable reason when not.
+ */
+export function validatePendingPrice(
+  side: Side,
+  type: 'limit' | 'stop',
+  price: number,
+  currentPrice: number,
+): string | null {
+  const below = price < currentPrice;
+  const above = price > currentPrice;
+  if (price === currentPrice) return 'Trigger must differ from current price';
+  if (side === 'buy' && type === 'limit' && !below)
+    return 'Buy limit must be below the market';
+  if (side === 'buy' && type === 'stop' && !above)
+    return 'Buy stop must be above the market';
+  if (side === 'sell' && type === 'limit' && !above)
+    return 'Sell limit must be above the market';
+  if (side === 'sell' && type === 'stop' && !below)
+    return 'Sell stop must be below the market';
   return null;
 }
 
