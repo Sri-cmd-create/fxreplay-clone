@@ -87,4 +87,23 @@ const drawId = useStore.getState().drawings[0].id;
 store.removeDrawing(drawId);
 assert(useStore.getState().drawings.length === 0, 'drawing removed');
 
+// 7. Partial close
+store.resetAccount();
+store.openPosition('buy', 1, null, null);
+const posId = useStore.getState().positions[0].id;
+store.closePartial(posId, 0.4);
+const rem = useStore.getState().positions[0];
+console.log('remaining lots:', rem.lots, 'history:', useStore.getState().history.length);
+assert(Math.abs(rem.lots - 0.6) < 1e-9, 'partial close leaves 0.6 lots');
+assert(useStore.getState().history.length === 1, 'partial close books one closed trade');
+store.closePartial(posId, 5); // more than remaining -> full close
+assert(useStore.getState().positions.length === 0, 'closing >= remaining fully closes');
+
+// 8. Jump / random start
+store.randomStart();
+console.log('playhead after random start:', useStore.getState().playhead());
+assert(useStore.getState().playing === false, 'random start pauses replay');
+store.jumpToTime(useStore.getState().baseCandles()[0].time);
+assert(useStore.getState().playhead() === 0, 'jumpToTime maps to the correct index');
+
 console.log('\nALL SMOKE TESTS PASSED');

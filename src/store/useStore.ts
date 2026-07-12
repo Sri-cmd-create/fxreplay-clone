@@ -69,6 +69,10 @@ interface StoreState {
   tick: () => void;
   /** Restart the current symbol's replay from the beginning of the session. */
   restartSession: () => void;
+  /** Jump the active symbol's replay to a random start date (fresh session). */
+  randomStart: () => void;
+  /** Jump the active symbol's replay to a specific point in time. */
+  jumpToTime: (unixSeconds: number) => void;
 
   openPosition: (
     side: Side,
@@ -77,6 +81,8 @@ interface StoreState {
     tp: number | null,
   ) => void;
   closePosition: (id: string) => void;
+  /** Close only part of a position's volume, booking the realised P&L. */
+  closePartial: (id: string, lots: number) => void;
   closeAll: () => void;
   modifyPosition: (id: string, sl: number | null, tp: number | null) => void;
   placePendingOrder: (
@@ -225,6 +231,24 @@ export const useStore = create<StoreState>((set, get) => ({
     });
   },
 
+  randomStart: () => {
+    const { symbol } = get();
+    const total = getBaseCandles(getInstrument(symbol)).length;
+    // Leave some history visible behind and enough room to replay forward.
+    const minIdx = Math.floor(total * 0.15);
+    const maxIdx = Math.max(minIdx + 1, total - FORWARD_BARS_M1);
+    const idx = minIdx + Math.floor(Math.random() * (maxIdx - minIdx));
+    jumpToIndex(get, set, idx);
+  },
+
+  jumpToTime: (unixSeconds) => {
+    const { symbol } = get();
+    const candles = getBaseCandles(getInstrument(symbol));
+    // Base data is continuous 1-minute candles, so index maps linearly.
+    const idx = Math.round((unixSeconds - candles[0].time) / 60);
+    jumpToIndex(get, set, idx);
+  },
+
   openPosition: (side, lots, sl, tp) => {
     const { symbol, currentPrice, currentTime, positions } = get();
     const price = currentPrice();
@@ -259,6 +283,40 @@ export const useStore = create<StoreState>((set, get) => ({
     };
     set({
       positions: state.positions.filter((p) => p.id !== id),
+      history: [closed, ...state.history],
+      balance: state.balance + pnl,
+    });
+  },
+
+  closePartial: (id, lots) => {
+    const state = get();
+    const pos = state.positions.find((p) => p.id === id);
+    if (!pos) return;
+    const closeLots = Math.min(Math.round(lots * 100) / 100, pos.lots);
+    if (closeLots <= 0) return;
+    // Closing the whole (or effectively the whole) position → full close.
+    if (closeLots >= pos.lots - 1e-9) {
+      get().closePosition(id);
+      return;
+    }
+    const instrument = getInstrument(pos.symbol);
+    const price = priceForSymbol(state, pos.symbol);
+    const time = timeForSymbol(state, pos.symbol);
+    const pnl = profit(pos.side, pos.entryPrice, price, closeLots, instrument);
+    const closed: ClosedTrade = {
+      ...pos,
+      lots: closeLots,
+      exitPrice: price,
+      exitTime: time,
+      reason: 'manual',
+      pnl,
+      pips: pipsGained(pos.side, pos.entryPrice, price, instrument),
+    };
+    const remaining = Math.round((pos.lots - closeLots) * 100) / 100;
+    set({
+      positions: state.positions.map((p) =>
+        p.id === id ? { ...p, lots: remaining } : p,
+      ),
       history: [closed, ...state.history],
       balance: state.balance + pnl,
     });
@@ -390,6 +448,27 @@ if (hasStorage) {
 }
 
 // ── Helpers operating on a snapshot of the store ─────────────────────────
+
+/**
+ * Move the active symbol's playhead to `index`, starting a fresh session:
+ * any open positions and resting orders on that symbol are cleared (their
+ * timestamps would otherwise be inconsistent with the new replay position).
+ */
+function jumpToIndex(
+  get: () => StoreState,
+  set: (partial: Partial<StoreState>) => void,
+  index: number,
+): void {
+  const { symbol, positions, pendingOrders, playheads } = get();
+  const total = getBaseCandles(getInstrument(symbol)).length;
+  const clamped = Math.max(0, Math.min(index, total - 1));
+  set({
+    playheads: { ...playheads, [symbol]: clamped },
+    playing: false,
+    positions: positions.filter((p) => p.symbol !== symbol),
+    pendingOrders: pendingOrders.filter((o) => o.symbol !== symbol),
+  });
+}
 
 function priceForSymbol(state: StoreState, symbol: string): number {
   const candles = getBaseCandles(getInstrument(symbol));

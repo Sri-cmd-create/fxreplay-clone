@@ -46,6 +46,7 @@ export function Chart() {
   const playhead = useStore((s) => s.playheads[s.symbol] ?? 0);
   const positions = useStore((s) => s.positions);
   const pendingOrders = useStore((s) => s.pendingOrders);
+  const history = useStore((s) => s.history);
 
   const instrument = getInstrument(symbol);
   const tf = TIMEFRAME_MAP[timeframe];
@@ -156,7 +157,29 @@ export function Chart() {
     priceLinesRef.current = [];
 
     const bucket = tfMinutes * 60;
+    const snap = (t: number) => (Math.floor(t / bucket) * bucket) as UTCTimestamp;
     const markers: SeriesMarker<Time>[] = [];
+
+    // Closed trades on this symbol: a muted entry marker + a win/loss-coloured
+    // exit marker labelled with how it closed (TP / SL / manual).
+    for (const t of history) {
+      if (t.symbol !== symbol) continue;
+      const isBuy = t.side === 'buy';
+      const win = t.pnl >= 0;
+      markers.push({
+        time: snap(t.entryTime),
+        position: isBuy ? 'belowBar' : 'aboveBar',
+        color: '#787b86',
+        shape: isBuy ? 'arrowUp' : 'arrowDown',
+      });
+      markers.push({
+        time: snap(t.exitTime),
+        position: isBuy ? 'aboveBar' : 'belowBar',
+        color: win ? '#26a69a' : '#ef5350',
+        shape: 'circle',
+        text: t.reason === 'tp' ? 'TP' : t.reason === 'sl' ? 'SL' : 'Close',
+      });
+    }
 
     for (const pos of positions) {
       if (pos.symbol !== symbol) continue;
@@ -197,9 +220,8 @@ export function Chart() {
         );
       }
 
-      const snapped = (Math.floor(pos.entryTime / bucket) * bucket) as UTCTimestamp;
       markers.push({
-        time: snapped,
+        time: snap(pos.entryTime),
         position: isBuy ? 'belowBar' : 'aboveBar',
         color: isBuy ? '#26a69a' : '#ef5350',
         shape: isBuy ? 'arrowUp' : 'arrowDown',
@@ -249,7 +271,7 @@ export function Chart() {
 
     markers.sort((a, b) => (a.time as number) - (b.time as number));
     series.setMarkers(markers);
-  }, [positions, pendingOrders, symbol, tfMinutes]);
+  }, [positions, pendingOrders, history, symbol, tfMinutes]);
 
   const firstTime = visible[0]?.time ?? 0;
   const lastCandle = visible[visible.length - 1] ?? null;

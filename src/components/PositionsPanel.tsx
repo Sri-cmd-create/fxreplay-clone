@@ -11,6 +11,7 @@ export function PositionsPanel() {
   const positions = useStore((s) => s.positions);
   const playheads = useStore((s) => s.playheads);
   const closePosition = useStore((s) => s.closePosition);
+  const closePartial = useStore((s) => s.closePartial);
   const closeAll = useStore((s) => s.closeAll);
 
   const priceOf = (symbol: string) => {
@@ -86,13 +87,24 @@ export function PositionsPanel() {
                   {formatMoney(pnl, true)}
                 </Td>
                 <Td className="text-right">
-                  <button
-                    title="Close position"
-                    onClick={() => closePosition(pos.id)}
-                    className="rounded p-1 text-muted hover:bg-down hover:text-white"
-                  >
-                    <CloseIcon width={12} height={12} />
-                  </button>
+                  <div className="flex items-center justify-end gap-1">
+                    <button
+                      title="Close half"
+                      onClick={() =>
+                        closePartial(pos.id, Math.floor((pos.lots / 2) * 100) / 100)
+                      }
+                      className="rounded bg-panel-hover px-1.5 py-0.5 text-[10px] font-medium text-white hover:bg-accent"
+                    >
+                      ½
+                    </button>
+                    <button
+                      title="Close position"
+                      onClick={() => closePosition(pos.id)}
+                      className="rounded p-1 text-muted hover:bg-down hover:text-white"
+                    >
+                      <CloseIcon width={12} height={12} />
+                    </button>
+                  </div>
                 </Td>
               </tr>
             );
