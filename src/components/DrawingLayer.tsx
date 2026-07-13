@@ -27,6 +27,7 @@ interface Props {
   /** Seconds per bar of the current timeframe. */
   tfSeconds: number;
   digits: number;
+  pipSize: number;
   probePrice: number;
 }
 
@@ -36,6 +37,7 @@ function DrawingLayerImpl({
   firstTime,
   tfSeconds,
   digits,
+  pipSize,
   probePrice,
 }: Props) {
   const overlayRef = useRef<HTMLDivElement | null>(null);
@@ -355,6 +357,9 @@ function DrawingLayerImpl({
               mapX={mapX}
               mapY={mapY}
               drag={drag}
+              digits={digits}
+              pipSize={pipSize}
+              tfSeconds={tfSeconds}
               onDelete={() => removeDrawing(d.id)}
               interactive={!isDrawMode}
             />
@@ -375,6 +380,9 @@ function DrawingLayerImpl({
               mapX={mapX}
               mapY={mapY}
               drag={drag}
+              digits={digits}
+              pipSize={pipSize}
+              tfSeconds={tfSeconds}
               onDelete={() => {}}
               interactive={false}
             />
@@ -410,6 +418,9 @@ interface ShapeProps {
   mapX: (time: number) => number | null;
   mapY: (price: number) => number | null;
   drag: DragApi;
+  digits: number;
+  pipSize: number;
+  tfSeconds: number;
   onDelete: () => void;
   interactive: boolean;
 }
@@ -422,6 +433,9 @@ function DrawingShape({
   mapX,
   mapY,
   drag,
+  digits,
+  pipSize,
+  tfSeconds,
   onDelete,
   interactive,
 }: ShapeProps) {
@@ -523,6 +537,61 @@ function DrawingShape({
     );
   }
 
+  if (type === 'measure') {
+    const rx = Math.min(x0, x1);
+    const ry = Math.min(y0, y1);
+    const rw = Math.abs(x1 - x0);
+    const rh = Math.abs(y1 - y0);
+    const cx = (x0 + x1) / 2;
+    const my = (y0 + y1) / 2;
+    const priceDelta = p1.price - p0.price;
+    const pips = priceDelta / pipSize;
+    const pct = p0.price !== 0 ? (priceDelta / p0.price) * 100 : 0;
+    const bars = Math.round(Math.abs(p1.time - p0.time) / tfSeconds);
+    const up = priceDelta >= 0;
+    const mColor = up ? '#26a69a' : '#ef5350';
+    const dir = y1 < y0 ? -1 : 1;
+    return (
+      <g>
+        <rect
+          x={rx}
+          y={ry}
+          width={rw}
+          height={rh}
+          fill={`${mColor}22`}
+          stroke={mColor}
+          strokeWidth={strokeW}
+          strokeDasharray={dash}
+          {...dragBind('move', 'all', 'move')}
+        />
+        <line x1={cx} y1={y0} x2={cx} y2={y1} stroke={mColor} strokeWidth={1.5} style={{ pointerEvents: 'none' }} />
+        <polygon
+          points={`${cx - 4},${y1 - dir * 7} ${cx + 4},${y1 - dir * 7} ${cx},${y1}`}
+          fill={mColor}
+          style={{ pointerEvents: 'none' }}
+        />
+        <g style={{ pointerEvents: 'none' }}>
+          <rect x={cx - 58} y={my - 15} width={116} height={30} rx={3} fill={mColor} />
+          <text x={cx} y={my - 3} textAnchor="middle" fontSize={11} fontWeight="bold" fill="#fff" fontFamily="monospace">
+            {pips >= 0 ? '+' : ''}
+            {pips.toFixed(1)} pips
+          </text>
+          <text x={cx} y={my + 9} textAnchor="middle" fontSize={9} fill="#fff" fontFamily="monospace">
+            {pct >= 0 ? '+' : ''}
+            {pct.toFixed(2)}% · {bars} bars
+          </text>
+        </g>
+        {selected && (
+          <>
+            <Handle x={x0} y={y0} color={mColor} drag={dragBind('point', 'all', 'grab', 0)} />
+            <Handle x={x1} y={y1} color={mColor} drag={dragBind('point', 'all', 'grab', 1)} />
+            <DeleteBadge x={rx + rw} y={ry} onDelete={onDelete} />
+          </>
+        )}
+      </g>
+    );
+  }
+
   // Fibonacci retracement
   const lo = Math.min(x0, x1);
   const hi = Math.max(x0, x1);
@@ -553,7 +622,7 @@ function DrawingShape({
               opacity={0.9}
             />
             <text x={lo + 3} y={y - 2} fill={color} fontSize={9} fontFamily="monospace">
-              {level.toFixed(3)} · {price.toFixed(Math.abs(price) >= 100 ? 2 : 4)}
+              {level.toFixed(3)} · {price.toFixed(digits)}
             </text>
           </g>
         );

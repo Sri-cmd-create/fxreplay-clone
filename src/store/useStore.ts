@@ -46,6 +46,8 @@ interface StoreState {
   speed: number;
 
   // ── Account ────────────────────────────────────────────────────────
+  /** Balance the account is (re)set to; also the equity-curve baseline. */
+  startingBalance: number;
   balance: number;
   positions: Position[];
   pendingOrders: PendingOrder[];
@@ -86,6 +88,8 @@ interface StoreState {
   closePartial: (id: string, lots: number) => void;
   closeAll: () => void;
   modifyPosition: (id: string, sl: number | null, tp: number | null) => void;
+  /** Set the starting balance and reset the account to it. */
+  setStartingBalance: (amount: number) => void;
   placePendingOrder: (
     side: Side,
     type: 'limit' | 'stop',
@@ -150,6 +154,7 @@ type PersistedState = Pick<
   | 'timeframe'
   | 'playheads'
   | 'speed'
+  | 'startingBalance'
   | 'balance'
   | 'positions'
   | 'pendingOrders'
@@ -180,6 +185,7 @@ export const useStore = create<StoreState>((set, get) => ({
   playing: false,
   speed: saved.speed ?? 1,
 
+  startingBalance: saved.startingBalance ?? STARTING_BALANCE,
   balance: saved.balance ?? STARTING_BALANCE,
   positions: saved.positions ?? [],
   pendingOrders: saved.pendingOrders ?? [],
@@ -360,11 +366,22 @@ export const useStore = create<StoreState>((set, get) => ({
 
   resetAccount: () =>
     set({
-      balance: STARTING_BALANCE,
+      balance: get().startingBalance,
       positions: [],
       pendingOrders: [],
       history: [],
     }),
+
+  setStartingBalance: (amount) => {
+    const clamped = Math.max(1, Math.round(amount));
+    set({
+      startingBalance: clamped,
+      balance: clamped,
+      positions: [],
+      pendingOrders: [],
+      history: [],
+    });
+  },
 
   // ── Drawing actions ────────────────────────────────────────────────
   setActiveTool: (tool) =>
@@ -440,6 +457,7 @@ if (hasStorage) {
         timeframe: state.timeframe,
         playheads: state.playheads,
         speed: state.speed,
+        startingBalance: state.startingBalance,
         balance: state.balance,
         positions: state.positions,
         pendingOrders: state.pendingOrders,

@@ -6,6 +6,7 @@ import {
   HorizontalIcon,
   RectangleIcon,
   FibIcon,
+  RulerIcon,
   TrashIcon,
 } from './icons';
 
@@ -15,6 +16,7 @@ const TOOLS: { tool: DrawingTool; label: string; Icon: typeof CursorIcon }[] = [
   { tool: 'horizontal', label: 'Horizontal line', Icon: HorizontalIcon },
   { tool: 'rectangle', label: 'Rectangle', Icon: RectangleIcon },
   { tool: 'fib', label: 'Fibonacci retracement', Icon: FibIcon },
+  { tool: 'measure', label: 'Measure (pips / % / bars)', Icon: RulerIcon },
 ];
 
 export function DrawingToolbar() {

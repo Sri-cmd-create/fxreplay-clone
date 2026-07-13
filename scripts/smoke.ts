@@ -114,4 +114,22 @@ assert(useStore.getState().playing === false, 'random start pauses replay');
 store.jumpToTime(useStore.getState().baseCandles()[0].time);
 assert(useStore.getState().playhead() === 0, 'jumpToTime maps to the correct index');
 
+// 9. Measure drawing + configurable starting balance
+store.addDrawing({
+  type: 'measure',
+  points: [{ time: p0, price: 1.1 }, { time: p0 + 3600, price: 1.11 }],
+  color: '#2962ff',
+});
+assert(
+  useStore.getState().drawings.some((d) => d.type === 'measure'),
+  'measure drawing added',
+);
+
+store.setStartingBalance(25000);
+assert(useStore.getState().startingBalance === 25000, 'starting balance updated');
+assert(useStore.getState().balance === 25000, 'setStartingBalance resets balance to it');
+assert(useStore.getState().history.length === 0, 'setStartingBalance clears history');
+store.resetAccount();
+assert(useStore.getState().balance === 25000, 'resetAccount uses the configured starting balance');
+
 console.log('\nALL SMOKE TESTS PASSED');

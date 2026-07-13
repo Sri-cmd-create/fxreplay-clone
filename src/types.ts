@@ -142,7 +142,8 @@ export type DrawingTool =
   | 'trendline'
   | 'horizontal'
   | 'rectangle'
-  | 'fib';
+  | 'fib'
+  | 'measure';
 
 /** A single anchor point in chart space (timeframe-independent). */
 export interface Point {

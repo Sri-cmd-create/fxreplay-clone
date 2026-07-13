@@ -273,6 +273,7 @@ export function Chart() {
           firstTime={firstTime}
           tfSeconds={tfMinutes * 60}
           digits={instrument.digits}
+          pipSize={instrument.pipSize}
           probePrice={instrument.basePrice}
         />
       </div>
