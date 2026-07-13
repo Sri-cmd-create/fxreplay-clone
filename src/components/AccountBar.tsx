@@ -24,9 +24,12 @@ function Metric({
 
 export function AccountBar() {
   const balance = useStore((s) => s.balance);
+  const startingBalance = useStore((s) => s.startingBalance);
   const derived = useStore((s) => s.derived());
 
   const pnlTone = derived.floatingPnl > 0 ? 'up' : derived.floatingPnl < 0 ? 'down' : 'default';
+  const returnPct = ((derived.equity - startingBalance) / startingBalance) * 100;
+  const returnTone = returnPct >= 0 ? 'up' : 'down';
 
   return (
     <div className="flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-border bg-panel-alt px-4 py-2">
@@ -35,6 +38,11 @@ export function AccountBar() {
         label="Equity"
         value={formatMoney(derived.equity)}
         tone={derived.equity >= balance ? 'up' : 'down'}
+      />
+      <Metric
+        label="Return"
+        value={`${returnPct >= 0 ? '+' : ''}${returnPct.toFixed(2)}%`}
+        tone={returnTone}
       />
       <Metric
         label="Floating P&L"

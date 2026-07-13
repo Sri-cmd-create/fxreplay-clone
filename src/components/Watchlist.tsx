@@ -10,6 +10,7 @@ import { formatPrice, formatSignedNumber } from '../lib/format';
 export function Watchlist() {
   const activeSymbol = useStore((s) => s.symbol);
   const setSymbol = useStore((s) => s.setSymbol);
+  // Subscribe to all playheads so prices update on every tick.
   const playheads = useStore((s) => s.playheads);
 
   return (

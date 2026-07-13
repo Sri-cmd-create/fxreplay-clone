@@ -1,3 +1,4 @@
+import { useCallback, useRef, useState } from 'react';
 import { Toolbar } from './components/Toolbar';
 import { AccountBar } from './components/AccountBar';
 import { Chart } from './components/Chart';
@@ -12,6 +13,27 @@ import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 export default function App() {
   useReplayLoop();
   useKeyboardShortcuts();
+
+  const [bottomH, setBottomH] = useState(224);
+  const dragRef = useRef<{ startY: number; startH: number } | null>(null);
+
+  const onDragStart = useCallback(
+    (e: React.PointerEvent) => {
+      dragRef.current = { startY: e.clientY, startH: bottomH };
+      (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    },
+    [bottomH],
+  );
+  const onDragMove = useCallback((e: React.PointerEvent) => {
+    const d = dragRef.current;
+    if (!d) return;
+    const newH = d.startH - (e.clientY - d.startY);
+    setBottomH(Math.max(80, Math.min(500, newH)));
+  }, []);
+  const onDragEnd = useCallback((e: React.PointerEvent) => {
+    dragRef.current = null;
+    (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+  }, []);
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-[#0c0e15]">
@@ -30,7 +52,14 @@ export default function App() {
           <div className="min-h-0 flex-1 border-b border-border">
             <Chart />
           </div>
-          <div className="h-56 shrink-0">
+          {/* Drag divider */}
+          <div
+            className="h-1 shrink-0 cursor-row-resize bg-border hover:bg-accent active:bg-accent"
+            onPointerDown={onDragStart}
+            onPointerMove={onDragMove}
+            onPointerUp={onDragEnd}
+          />
+          <div className="shrink-0" style={{ height: bottomH }}>
             <BottomPanel />
           </div>
         </div>

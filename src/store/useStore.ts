@@ -190,7 +190,13 @@ function loadPersisted(): Partial<PersistedState> {
   if (!hasStorage) return {};
   try {
     const raw = window.localStorage.getItem(PERSIST_KEY);
-    return raw ? (JSON.parse(raw) as Partial<PersistedState>) : {};
+    if (!raw) return {};
+    const data = JSON.parse(raw) as Partial<PersistedState>;
+    // Schema guard: if the saved data is clearly wrong-shaped, ignore it.
+    if (typeof data !== 'object' || data === null) return {};
+    if (data.balance != null && typeof data.balance !== 'number') return {};
+    if (data.positions != null && !Array.isArray(data.positions)) return {};
+    return data;
   } catch {
     return {};
   }

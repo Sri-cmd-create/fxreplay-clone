@@ -12,14 +12,18 @@ interface Props {
 }
 
 /**
- * Right-click context menu on the chart: quick buy/sell at a price, or set an
- * alert. Uses the current order ticket's SL/TP pip settings.
+ * Right-click context menu on the chart: quick buy/sell at the current market
+ * price using the order ticket's lot size, or set an alert at the clicked level.
  */
 export function ChartContextMenu({ x, y, price, onClose }: Props) {
   const ref = useRef<HTMLDivElement | null>(null);
   const symbol = useStore((s) => s.symbol);
   const openPosition = useStore((s) => s.openPosition);
   const addAlert = useStore((s) => s.addAlert);
+  const currentPrice = useStore((s) => {
+    void s.playheads[s.symbol];
+    return s.currentPrice();
+  });
   const instrument = getInstrument(symbol);
   const roundedPrice = Number(price.toFixed(instrument.digits));
 
@@ -55,25 +59,25 @@ export function ChartContextMenu({ x, y, price, onClose }: Props) {
   return (
     <div
       ref={ref}
-      className="fixed z-50 w-52 overflow-hidden rounded-md border border-border bg-panel-alt shadow-xl shadow-black/50"
+      className="fixed z-50 w-56 overflow-hidden rounded-md border border-border bg-panel-alt shadow-xl shadow-black/50"
       style={{ left: x, top: y }}
     >
       <div className="border-b border-border px-3 py-1.5 text-[10px] text-muted">
-        {symbol} @ {formatPrice(roundedPrice, instrument.digits)}
+        {symbol} · market @ {formatPrice(currentPrice, instrument.digits)}
       </div>
       <button
         onClick={buy}
         className="flex w-full items-center gap-2 px-3 py-2 text-xs text-up hover:bg-panel-hover"
       >
         <span className="h-2 w-2 rounded-full bg-up" />
-        Buy 0.1 lot at market
+        Buy at market
       </button>
       <button
         onClick={sell}
         className="flex w-full items-center gap-2 px-3 py-2 text-xs text-down hover:bg-panel-hover"
       >
         <span className="h-2 w-2 rounded-full bg-down" />
-        Sell 0.1 lot at market
+        Sell at market
       </button>
       <div className="border-t border-border" />
       <button
@@ -81,7 +85,7 @@ export function ChartContextMenu({ x, y, price, onClose }: Props) {
         className="flex w-full items-center gap-2 px-3 py-2 text-xs text-[#f0b90b] hover:bg-panel-hover"
       >
         <BellIcon width={12} height={12} />
-        Alert at {formatPrice(roundedPrice, instrument.digits)}
+        Alert @ {formatPrice(roundedPrice, instrument.digits)}
       </button>
     </div>
   );

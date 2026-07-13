@@ -92,7 +92,7 @@ export function Toolbar() {
           <RestartIcon />
         </button>
         <button
-          title={playing ? 'Pause' : 'Play'}
+          title={playing ? 'Pause (Space)' : 'Play (Space)'}
           onClick={togglePlay}
           disabled={atEnd}
           className="rounded bg-accent p-1.5 text-white hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
@@ -100,7 +100,7 @@ export function Toolbar() {
           {playing ? <PauseIcon /> : <PlayIcon />}
         </button>
         <button
-          title="Step forward one bar"
+          title="Step forward one bar (→)"
           onClick={stepForward}
           disabled={atEnd}
           className="rounded p-1.5 text-muted hover:bg-panel-hover hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
