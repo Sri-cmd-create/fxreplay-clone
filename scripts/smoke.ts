@@ -84,6 +84,14 @@ store.addDrawing({
 });
 assert(useStore.getState().drawings.length === 1, 'drawing added');
 const drawId = useStore.getState().drawings[0].id;
+store.updateDrawing(drawId, [
+  { time: p0, price: 1.15 },
+  { time: p0 + 3600, price: 1.16 },
+]);
+assert(
+  useStore.getState().drawings[0].points[0].price === 1.15,
+  'updateDrawing repositions anchor points',
+);
 store.removeDrawing(drawId);
 assert(useStore.getState().drawings.length === 0, 'drawing removed');
 

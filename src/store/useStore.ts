@@ -5,6 +5,7 @@ import type {
   Drawing,
   DrawingTool,
   PendingOrder,
+  Point,
   Position,
   Side,
   TimeframeCode,
@@ -101,6 +102,7 @@ interface StoreState {
   setActiveTool: (tool: DrawingTool) => void;
   setDrawingColor: (color: string) => void;
   addDrawing: (drawing: Omit<Drawing, 'id' | 'symbol'>) => void;
+  updateDrawing: (id: string, points: Point[]) => void;
   removeDrawing: (id: string) => void;
   selectDrawing: (id: string | null) => void;
   clearDrawings: () => void;
@@ -374,6 +376,12 @@ export const useStore = create<StoreState>((set, get) => ({
         ...get().drawings,
         { ...drawing, id: nextId('draw'), symbol: get().symbol },
       ],
+    }),
+  updateDrawing: (id, points) =>
+    set({
+      drawings: get().drawings.map((d) =>
+        d.id === id ? { ...d, points } : d,
+      ),
     }),
   removeDrawing: (id) =>
     set({

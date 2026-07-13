@@ -44,6 +44,7 @@ function DrawingLayerImpl({
   const drawingColor = useStore((s) => s.drawingColor);
   const selectedId = useStore((s) => s.selectedDrawingId);
   const addDrawing = useStore((s) => s.addDrawing);
+  const updateDrawing = useStore((s) => s.updateDrawing);
   const removeDrawing = useStore((s) => s.removeDrawing);
   const selectDrawing = useStore((s) => s.selectDrawing);
   const setActiveTool = useStore((s) => s.setActiveTool);
@@ -53,6 +54,15 @@ function DrawingLayerImpl({
   const [size, setSize] = useState({ w: 0, h: 0 });
   const [draft, setDraft] = useState<Draft | null>(null);
   const [, force] = useReducer((x) => x + 1, 0);
+
+  const dragRef = useRef<{
+    id: string;
+    mode: 'move' | 'point';
+    pointIndex?: number;
+    start: Point;
+    orig: Point[];
+    pointerId: number;
+  } | null>(null);
 
   const isDrawMode = activeTool !== 'cursor';
 
@@ -143,6 +153,57 @@ function DrawingLayerImpl({
     return { time: firstTime + (logical as number) * tfSeconds, price: roundPrice(price) };
   };
 
+  // ── Dragging existing drawings (cursor mode) ──────────────────────
+  const drag: DragApi = {
+    begin: (e, id, origPoints, mode, pointIndex) => {
+      const start = toData(e.clientX, e.clientY);
+      if (!start) return;
+      e.stopPropagation();
+      selectDrawing(id);
+      dragRef.current = {
+        id,
+        mode,
+        pointIndex,
+        start,
+        orig: origPoints.map((p) => ({ ...p })),
+        pointerId: e.pointerId,
+      };
+      try {
+        (e.currentTarget as Element).setPointerCapture(e.pointerId);
+      } catch {
+        /* ignore */
+      }
+    },
+    move: (e) => {
+      const d = dragRef.current;
+      if (!d || e.pointerId !== d.pointerId) return;
+      const cur = toData(e.clientX, e.clientY);
+      if (!cur) return;
+      if (d.mode === 'point' && d.pointIndex != null) {
+        const pts = d.orig.map((p, i) => (i === d.pointIndex ? cur : p));
+        updateDrawing(d.id, pts);
+      } else {
+        const dt = cur.time - d.start.time;
+        const dp = cur.price - d.start.price;
+        const pts = d.orig.map((p) => ({
+          time: p.time + dt,
+          price: roundPrice(p.price + dp),
+        }));
+        updateDrawing(d.id, pts);
+      }
+    },
+    end: (e) => {
+      const d = dragRef.current;
+      if (!d) return;
+      try {
+        (e.currentTarget as Element).releasePointerCapture(d.pointerId);
+      } catch {
+        /* ignore */
+      }
+      dragRef.current = null;
+    },
+  };
+
   // ── Drawing interactions (draw mode) ──────────────────────────────
   const onCapturePointerDown = (e: React.PointerEvent) => {
     const p = toData(e.clientX, e.clientY);
@@ -198,7 +259,7 @@ function DrawingLayerImpl({
               width={size.w}
               mapX={mapX}
               mapY={mapY}
-              onSelect={() => !isDrawMode && selectDrawing(d.id)}
+              drag={drag}
               onDelete={() => removeDrawing(d.id)}
               interactive={!isDrawMode}
             />
@@ -218,7 +279,7 @@ function DrawingLayerImpl({
               width={size.w}
               mapX={mapX}
               mapY={mapY}
-              onSelect={() => {}}
+              drag={drag}
               onDelete={() => {}}
               interactive={false}
             />
@@ -234,6 +295,18 @@ export const DrawingLayer = memo(DrawingLayerImpl);
 
 // ── Individual drawing renderer ──────────────────────────────────────────
 
+interface DragApi {
+  begin: (
+    e: React.PointerEvent,
+    id: string,
+    origPoints: Point[],
+    mode: 'move' | 'point',
+    pointIndex?: number,
+  ) => void;
+  move: (e: React.PointerEvent) => void;
+  end: (e: React.PointerEvent) => void;
+}
+
 interface ShapeProps {
   drawing: Drawing;
   selected: boolean;
@@ -241,7 +314,7 @@ interface ShapeProps {
   width: number;
   mapX: (time: number) => number | null;
   mapY: (price: number) => number | null;
-  onSelect: () => void;
+  drag: DragApi;
   onDelete: () => void;
   interactive: boolean;
 }
@@ -253,21 +326,32 @@ function DrawingShape({
   width,
   mapX,
   mapY,
-  onSelect,
+  drag,
   onDelete,
   interactive,
 }: ShapeProps) {
   const { type, points, color } = drawing;
   const strokeW = selected ? 2.5 : 1.5;
   const dash = preview ? '5 4' : undefined;
-  const hitProps = {
-    onPointerDown: (e: React.PointerEvent) => {
-      if (!interactive) return;
-      e.stopPropagation();
-      onSelect();
-    },
-    style: { pointerEvents: interactive ? ('stroke' as const) : ('none' as const) },
-  };
+
+  // Pointer handlers that start a drag on a shape body ('move') or an
+  // endpoint handle ('point'). Uses pointer capture so the drag continues
+  // smoothly even when the cursor leaves the (thin) shape.
+  const dragBind = (
+    mode: 'move' | 'point',
+    hit: 'stroke' | 'all',
+    cursor: string,
+    pointIndex?: number,
+  ) =>
+    interactive
+      ? {
+          onPointerDown: (e: React.PointerEvent) =>
+            drag.begin(e, drawing.id, points, mode, pointIndex),
+          onPointerMove: drag.move,
+          onPointerUp: drag.end,
+          style: { pointerEvents: hit, cursor } as React.CSSProperties,
+        }
+      : { style: { pointerEvents: 'none' as const } };
 
   const p0 = points[0];
   const x0 = mapX(p0.time);
@@ -284,7 +368,7 @@ function DrawingShape({
           y2={y0}
           stroke="transparent"
           strokeWidth={10}
-          {...hitProps}
+          {...dragBind('move', 'stroke', 'ns-resize')}
         />
         <line x1={0} x2={width} y1={y0} y2={y0} stroke={color} strokeWidth={strokeW} strokeDasharray={dash} />
         {selected && <DeleteBadge x={width - 24} y={y0} onDelete={onDelete} />}
@@ -302,12 +386,12 @@ function DrawingShape({
     const my = (y0 + y1) / 2;
     return (
       <g>
-        <line x1={x0} y1={y0} x2={x1} y2={y1} stroke="transparent" strokeWidth={12} {...hitProps} />
+        <line x1={x0} y1={y0} x2={x1} y2={y1} stroke="transparent" strokeWidth={12} {...dragBind('move', 'stroke', 'move')} />
         <line x1={x0} y1={y0} x2={x1} y2={y1} stroke={color} strokeWidth={strokeW} strokeDasharray={dash} />
         {selected && (
           <>
-            <Handle x={x0} y={y0} color={color} />
-            <Handle x={x1} y={y1} color={color} />
+            <Handle x={x0} y={y0} color={color} drag={dragBind('point', 'all', 'grab', 0)} />
+            <Handle x={x1} y={y1} color={color} drag={dragBind('point', 'all', 'grab', 1)} />
             <DeleteBadge x={mx} y={my - 16} onDelete={onDelete} />
           </>
         )}
@@ -331,17 +415,12 @@ function DrawingShape({
           stroke={color}
           strokeWidth={strokeW}
           strokeDasharray={dash}
-          style={{ pointerEvents: interactive ? 'all' : 'none' }}
-          onPointerDown={(e) => {
-            if (!interactive) return;
-            e.stopPropagation();
-            onSelect();
-          }}
+          {...dragBind('move', 'all', 'move')}
         />
         {selected && (
           <>
-            <Handle x={x0} y={y0} color={color} />
-            <Handle x={x1} y={y1} color={color} />
+            <Handle x={x0} y={y0} color={color} drag={dragBind('point', 'all', 'grab', 0)} />
+            <Handle x={x1} y={y1} color={color} drag={dragBind('point', 'all', 'grab', 1)} />
             <DeleteBadge x={rx + rw} y={ry} onDelete={onDelete} />
           </>
         )}
@@ -360,12 +439,7 @@ function DrawingShape({
         width={hi - lo}
         height={Math.abs(y1 - y0)}
         fill="transparent"
-        style={{ pointerEvents: interactive ? 'all' : 'none' }}
-        onPointerDown={(e) => {
-          if (!interactive) return;
-          e.stopPropagation();
-          onSelect();
-        }}
+        {...dragBind('move', 'all', 'move')}
       />
       {FIB_LEVELS.map((level) => {
         const price = p0.price + (p1.price - p0.price) * level;
@@ -391,8 +465,8 @@ function DrawingShape({
       })}
       {selected && (
         <>
-          <Handle x={x0} y={y0} color={color} />
-          <Handle x={x1} y={y1} color={color} />
+          <Handle x={x0} y={y0} color={color} drag={dragBind('point', 'all', 'grab', 0)} />
+          <Handle x={x1} y={y1} color={color} drag={dragBind('point', 'all', 'grab', 1)} />
           <DeleteBadge x={hi} y={Math.min(y0, y1)} onDelete={onDelete} />
         </>
       )}
@@ -400,8 +474,18 @@ function DrawingShape({
   );
 }
 
-function Handle({ x, y, color }: { x: number; y: number; color: string }) {
-  return <circle cx={x} cy={y} r={4} fill="#fff" stroke={color} strokeWidth={1.5} />;
+function Handle({
+  x,
+  y,
+  color,
+  drag,
+}: {
+  x: number;
+  y: number;
+  color: string;
+  drag?: React.SVGProps<SVGCircleElement>;
+}) {
+  return <circle cx={x} cy={y} r={5} fill="#fff" stroke={color} strokeWidth={1.5} {...drag} />;
 }
 
 function DeleteBadge({
