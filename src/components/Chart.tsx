@@ -20,6 +20,7 @@ import { aggregate } from '../lib/timeframe';
 import type { Candle } from '../types';
 import { DrawingToolbar } from './DrawingToolbar';
 import { DrawingLayer } from './DrawingLayer';
+import { ChartContextMenu } from './ChartContextMenu';
 
 function toSeriesData(candles: Candle[]): CandlestickData[] {
   return candles.map((c) => ({
@@ -40,6 +41,7 @@ export function Chart() {
   const prevLenRef = useRef<number>(0);
 
   const [chartReady, setChartReady] = useState(false);
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; price: number } | null>(null);
 
   const symbol = useStore((s) => s.symbol);
   const timeframe = useStore((s) => s.timeframe);
@@ -256,7 +258,20 @@ export function Chart() {
   return (
     <div className="flex h-full w-full">
       <DrawingToolbar />
-      <div className="relative min-w-0 flex-1">
+      <div
+        className="relative min-w-0 flex-1"
+        onContextMenu={(e) => {
+          e.preventDefault();
+          const series = seriesRef.current;
+          if (!series) return;
+          const rect = e.currentTarget.getBoundingClientRect();
+          const y = e.clientY - rect.top;
+          const price = series.coordinateToPrice(y);
+          if (price != null) {
+            setCtxMenu({ x: e.clientX, y: e.clientY, price });
+          }
+        }}
+      >
         <div ref={containerRef} className="h-full w-full" />
         <ChartLegend
           chartRef={chartRef}
@@ -276,6 +291,14 @@ export function Chart() {
           pipSize={instrument.pipSize}
           probePrice={instrument.basePrice}
         />
+        {ctxMenu && (
+          <ChartContextMenu
+            x={ctxMenu.x}
+            y={ctxMenu.y}
+            price={ctxMenu.price}
+            onClose={() => setCtxMenu(null)}
+          />
+        )}
       </div>
     </div>
   );
