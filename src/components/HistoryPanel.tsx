@@ -6,7 +6,7 @@ import {
   formatSignedNumber,
   formatTime,
 } from '../lib/format';
-import type { CloseReason } from '../types';
+import type { CloseReason, ClosedTrade } from '../types';
 
 const reasonLabel: Record<CloseReason, string> = {
   manual: 'Manual',
@@ -31,8 +31,20 @@ export function HistoryPanel() {
   }
 
   return (
-    <div className="h-full overflow-auto">
-      <table className="w-full border-collapse text-xs">
+    <div className="flex h-full flex-col">
+      <div className="flex items-center justify-between border-b border-border/60 px-3 py-1">
+        <span className="text-[11px] text-muted">
+          {history.length} closed {history.length === 1 ? 'trade' : 'trades'}
+        </span>
+        <button
+          onClick={() => exportCsv(history)}
+          className="rounded bg-panel-alt px-2 py-0.5 text-[10px] font-medium text-white hover:bg-panel-hover"
+        >
+          Export CSV
+        </button>
+      </div>
+      <div className="min-h-0 flex-1 overflow-auto">
+        <table className="w-full border-collapse text-xs">
         <thead className="sticky top-0 bg-panel-alt text-[10px] uppercase tracking-wide text-muted">
           <tr>
             <Th>Symbol</Th>
@@ -77,9 +89,46 @@ export function HistoryPanel() {
             );
           })}
         </tbody>
-      </table>
+        </table>
+      </div>
     </div>
   );
+}
+
+/** Export the trade journal (oldest-first) as a downloadable CSV file. */
+function exportCsv(history: ClosedTrade[]) {
+  const header = [
+    'Symbol',
+    'Side',
+    'Lots',
+    'Entry',
+    'Exit',
+    'Opened (UTC)',
+    'Closed (UTC)',
+    'Reason',
+    'Pips',
+    'PnL',
+  ];
+  const rows = [...history].reverse().map((t) => [
+    t.symbol,
+    t.side,
+    t.lots,
+    t.entryPrice,
+    t.exitPrice,
+    new Date(t.entryTime * 1000).toISOString(),
+    new Date(t.exitTime * 1000).toISOString(),
+    t.reason,
+    t.pips.toFixed(1),
+    t.pnl.toFixed(2),
+  ]);
+  const csv = [header, ...rows].map((r) => r.join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `fxreplay-journal-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 function Th({ children, className = '' }: { children?: React.ReactNode; className?: string }) {

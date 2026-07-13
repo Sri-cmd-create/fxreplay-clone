@@ -6,6 +6,7 @@ import { pipValue, requiredMargin, validatePendingPrice } from '../lib/trading';
 import type { OrderType, Side } from '../types';
 
 const LOT_PRESETS = [0.01, 0.1, 0.5, 1];
+const RISK_PRESETS = [0.5, 1, 2, 3];
 const ORDER_TYPES: { value: OrderType; label: string }[] = [
   { value: 'market', label: 'Market' },
   { value: 'limit', label: 'Limit' },
@@ -19,6 +20,7 @@ export function OrderPanel() {
     return s.currentPrice();
   });
   const freeMargin = useStore((s) => s.derived().freeMargin);
+  const balance = useStore((s) => s.balance);
   const openPosition = useStore((s) => s.openPosition);
   const placePendingOrder = useStore((s) => s.placePendingOrder);
 
@@ -30,7 +32,9 @@ export function OrderPanel() {
 
   const [orderType, setOrderType] = useState<OrderType>('market');
   const [triggerPrice, setTriggerPrice] = useState(0);
+  const [sizeMode, setSizeMode] = useState<'lots' | 'risk'>('lots');
   const [lots, setLots] = useState(0.1);
+  const [riskPct, setRiskPct] = useState(1);
   const [useSl, setUseSl] = useState(true);
   const [useTp, setUseTp] = useState(true);
   const [slPips, setSlPips] = useState(20);
@@ -48,12 +52,28 @@ export function OrderPanel() {
   const isPending = orderType !== 'market';
   const basePrice = isPending ? triggerPrice : currentPrice;
 
-  const perPip = pipValue(lots, instrument);
-  const margin = requiredMargin(basePrice, lots, instrument);
+  // Position sizing: either a manual lot size, or a lot size derived from a
+  // percentage of the account balance risked over the stop-loss distance.
+  let effectiveLots = lots;
+  let sizingError: string | null = null;
+  if (sizeMode === 'risk') {
+    if (!useSl || slPips <= 0) {
+      sizingError = 'Enable a stop-loss to size by risk';
+      effectiveLots = 0;
+    } else {
+      const riskAmount = balance * (riskPct / 100);
+      const riskPerLot = slPips * pipValue(1, instrument);
+      effectiveLots = Math.max(0.01, Math.floor((riskAmount / riskPerLot) * 100) / 100);
+    }
+  }
+
+  const perPip = pipValue(effectiveLots, instrument);
+  const margin = requiredMargin(basePrice, effectiveLots, instrument);
   const risk = useSl ? perPip * slPips : 0;
   const reward = useTp ? perPip * tpPips : 0;
   const rr = risk > 0 && reward > 0 ? reward / risk : 0;
   const insufficient = margin > freeMargin;
+  const blocked = insufficient || sizingError != null;
 
   const invalidFor = (side: Side): string | null =>
     isPending
@@ -74,17 +94,18 @@ export function OrderPanel() {
   };
 
   const submit = (side: Side) => {
-    if (insufficient) return;
+    if (blocked) return;
     const { sl, tp } = computeStops(side);
     if (isPending) {
       if (invalidFor(side)) return;
-      placePendingOrder(side, orderType as 'limit' | 'stop', lots, roundP(triggerPrice), sl, tp);
+      placePendingOrder(side, orderType as 'limit' | 'stop', effectiveLots, roundP(triggerPrice), sl, tp);
     } else {
-      openPosition(side, lots, sl, tp);
+      openPosition(side, effectiveLots, sl, tp);
     }
   };
 
   const clampLots = (v: number) => Math.max(0.01, Math.round(v * 100) / 100);
+  const clampRisk = (v: number) => Math.min(100, Math.max(0.1, Math.round(v * 100) / 100));
   const orderLabel = (side: Side) =>
     isPending ? `${side === 'buy' ? 'Buy' : 'Sell'} ${orderType}` : side.toUpperCase();
 
@@ -144,46 +165,115 @@ export function OrderPanel() {
         </div>
       )}
 
-      {/* Lot size */}
+      {/* Position sizing */}
       <div>
-        <label className="mb-1 block text-[11px] text-muted">Volume (lots)</label>
-        <div className="flex items-center gap-1">
-          <button
-            onClick={() => setLots((v) => clampLots(v - 0.01))}
-            className="h-8 w-8 rounded bg-panel-alt text-lg text-muted hover:bg-panel-hover hover:text-white"
-          >
-            −
-          </button>
-          <input
-            type="number"
-            step={0.01}
-            min={0.01}
-            value={lots}
-            onChange={(e) => setLots(clampLots(Number(e.target.value) || 0.01))}
-            className="h-8 w-full rounded bg-panel-alt px-2 text-center font-mono text-sm text-white outline-none ring-1 ring-border focus:ring-accent"
-          />
-          <button
-            onClick={() => setLots((v) => clampLots(v + 0.01))}
-            className="h-8 w-8 rounded bg-panel-alt text-lg text-muted hover:bg-panel-hover hover:text-white"
-          >
-            +
-          </button>
+        <div className="mb-1 flex items-center justify-between">
+          <label className="text-[11px] text-muted">
+            {sizeMode === 'lots' ? 'Volume (lots)' : 'Risk (% of balance)'}
+          </label>
+          <div className="flex items-center gap-0.5 rounded bg-panel-alt p-0.5">
+            {(['lots', 'risk'] as const).map((m) => (
+              <button
+                key={m}
+                onClick={() => setSizeMode(m)}
+                className={`rounded px-1.5 py-0.5 text-[10px] font-medium transition-colors ${
+                  sizeMode === m
+                    ? 'bg-accent text-white'
+                    : 'text-muted hover:text-white'
+                }`}
+              >
+                {m === 'lots' ? 'Lots' : 'Risk %'}
+              </button>
+            ))}
+          </div>
         </div>
-        <div className="mt-1 flex gap-1">
-          {LOT_PRESETS.map((p) => (
-            <button
-              key={p}
-              onClick={() => setLots(p)}
-              className={`flex-1 rounded px-1 py-0.5 text-[11px] ${
-                lots === p
-                  ? 'bg-accent text-white'
-                  : 'bg-panel-alt text-muted hover:bg-panel-hover hover:text-white'
-              }`}
-            >
-              {p}
-            </button>
-          ))}
-        </div>
+
+        {sizeMode === 'lots' ? (
+          <>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setLots((v) => clampLots(v - 0.01))}
+                className="h-8 w-8 rounded bg-panel-alt text-lg text-muted hover:bg-panel-hover hover:text-white"
+              >
+                −
+              </button>
+              <input
+                type="number"
+                step={0.01}
+                min={0.01}
+                value={lots}
+                onChange={(e) => setLots(clampLots(Number(e.target.value) || 0.01))}
+                className="h-8 w-full rounded bg-panel-alt px-2 text-center font-mono text-sm text-white outline-none ring-1 ring-border focus:ring-accent"
+              />
+              <button
+                onClick={() => setLots((v) => clampLots(v + 0.01))}
+                className="h-8 w-8 rounded bg-panel-alt text-lg text-muted hover:bg-panel-hover hover:text-white"
+              >
+                +
+              </button>
+            </div>
+            <div className="mt-1 flex gap-1">
+              {LOT_PRESETS.map((p) => (
+                <button
+                  key={p}
+                  onClick={() => setLots(p)}
+                  className={`flex-1 rounded px-1 py-0.5 text-[11px] ${
+                    lots === p
+                      ? 'bg-accent text-white'
+                      : 'bg-panel-alt text-muted hover:bg-panel-hover hover:text-white'
+                  }`}
+                >
+                  {p}
+                </button>
+              ))}
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setRiskPct((v) => clampRisk(v - 0.25))}
+                className="h-8 w-8 rounded bg-panel-alt text-lg text-muted hover:bg-panel-hover hover:text-white"
+              >
+                −
+              </button>
+              <div className="relative w-full">
+                <input
+                  type="number"
+                  step={0.25}
+                  min={0.1}
+                  value={riskPct}
+                  onChange={(e) => setRiskPct(clampRisk(Number(e.target.value) || 0.1))}
+                  className="h-8 w-full rounded bg-panel-alt px-2 text-center font-mono text-sm text-white outline-none ring-1 ring-border focus:ring-accent"
+                />
+                <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-muted">
+                  %
+                </span>
+              </div>
+              <button
+                onClick={() => setRiskPct((v) => clampRisk(v + 0.25))}
+                className="h-8 w-8 rounded bg-panel-alt text-lg text-muted hover:bg-panel-hover hover:text-white"
+              >
+                +
+              </button>
+            </div>
+            <div className="mt-1 flex gap-1">
+              {RISK_PRESETS.map((p) => (
+                <button
+                  key={p}
+                  onClick={() => setRiskPct(p)}
+                  className={`flex-1 rounded px-1 py-0.5 text-[11px] ${
+                    riskPct === p
+                      ? 'bg-accent text-white'
+                      : 'bg-panel-alt text-muted hover:bg-panel-hover hover:text-white'
+                  }`}
+                >
+                  {p}%
+                </button>
+              ))}
+            </div>
+          </>
+        )}
       </div>
 
       {/* SL / TP */}
@@ -208,6 +298,12 @@ export function OrderPanel() {
 
       {/* Summary */}
       <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px]">
+        {sizeMode === 'risk' && (
+          <Info
+            label="Volume"
+            value={sizingError ? '—' : `${effectiveLots.toFixed(2)} lots`}
+          />
+        )}
         <Info label="Pip value" value={formatMoney(perPip)} />
         <Info label="Margin" value={formatMoney(margin)} />
         <Info label="Risk" value={useSl ? formatMoney(risk) : '—'} tone="down" />
@@ -215,6 +311,9 @@ export function OrderPanel() {
         <Info label="R:R" value={rr > 0 ? `1 : ${rr.toFixed(2)}` : '—'} />
       </div>
 
+      {sizingError && (
+        <p className="text-center text-[11px] text-muted">{sizingError}</p>
+      )}
       {insufficient && (
         <p className="text-center text-[11px] text-down">
           Insufficient free margin for this volume.
@@ -227,14 +326,14 @@ export function OrderPanel() {
           side="sell"
           label={orderLabel('sell')}
           invalidReason={invalidFor('sell')}
-          disabled={insufficient}
+          disabled={blocked}
           onClick={() => submit('sell')}
         />
         <OrderButton
           side="buy"
           label={orderLabel('buy')}
           invalidReason={invalidFor('buy')}
-          disabled={insufficient}
+          disabled={blocked}
           onClick={() => submit('buy')}
         />
       </div>
