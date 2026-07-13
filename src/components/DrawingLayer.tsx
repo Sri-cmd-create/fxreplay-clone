@@ -8,6 +8,7 @@ import {
 } from 'react';
 import type { IChartApi, ISeriesApi, Logical } from 'lightweight-charts';
 import { useStore } from '../store/useStore';
+import { formatPrice } from '../lib/format';
 import type { Drawing, DrawingType, Point } from '../types';
 
 const FIB_LEVELS = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1];
@@ -50,6 +51,9 @@ function DrawingLayerImpl({
   const setActiveTool = useStore((s) => s.setActiveTool);
   const allDrawings = useStore((s) => s.drawings);
   const drawings = allDrawings.filter((d) => d.symbol === symbol);
+  const positions = useStore((s) => s.positions);
+  const modifyPosition = useStore((s) => s.modifyPosition);
+  const activePositions = positions.filter((p) => p.symbol === symbol);
 
   const [size, setSize] = useState({ w: 0, h: 0 });
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -61,6 +65,13 @@ function DrawingLayerImpl({
     pointIndex?: number;
     start: Point;
     orig: Point[];
+    pointerId: number;
+  } | null>(null);
+
+  // Drag state for stop-loss / take-profit lines of open positions.
+  const slDragRef = useRef<{
+    id: string;
+    field: 'sl' | 'tp';
     pointerId: number;
   } | null>(null);
 
@@ -204,6 +215,83 @@ function DrawingLayerImpl({
     },
   };
 
+  // ── Dragging SL / TP lines of open positions ──────────────────────
+  const slDrag = {
+    begin: (e: React.PointerEvent, id: string, field: 'sl' | 'tp') => {
+      e.stopPropagation();
+      slDragRef.current = { id, field, pointerId: e.pointerId };
+      try {
+        (e.currentTarget as Element).setPointerCapture(e.pointerId);
+      } catch {
+        /* ignore */
+      }
+    },
+    move: (e: React.PointerEvent) => {
+      const d = slDragRef.current;
+      if (!d || e.pointerId !== d.pointerId) return;
+      const cur = toData(e.clientX, e.clientY);
+      if (!cur) return;
+      const pos = useStore.getState().positions.find((p) => p.id === d.id);
+      if (!pos) return;
+      modifyPosition(
+        d.id,
+        d.field === 'sl' ? cur.price : pos.sl,
+        d.field === 'tp' ? cur.price : pos.tp,
+      );
+    },
+    end: (e: React.PointerEvent) => {
+      const d = slDragRef.current;
+      if (!d) return;
+      try {
+        (e.currentTarget as Element).releasePointerCapture(d.pointerId);
+      } catch {
+        /* ignore */
+      }
+      slDragRef.current = null;
+    },
+  };
+
+  const slBind = (id: string, field: 'sl' | 'tp', hit: 'stroke' | 'all') =>
+    isDrawMode
+      ? { style: { pointerEvents: 'none' as const } }
+      : {
+          onPointerDown: (e: React.PointerEvent) => slDrag.begin(e, id, field),
+          onPointerMove: slDrag.move,
+          onPointerUp: slDrag.end,
+          style: { pointerEvents: hit, cursor: 'ns-resize' } as React.CSSProperties,
+        };
+
+  const renderPosLine = (
+    id: string,
+    field: 'sl' | 'tp',
+    price: number,
+    color: string,
+  ) => {
+    const y = mapY(price);
+    if (y == null) return null;
+    return (
+      <g key={`${id}-${field}`}>
+        <line x1={0} x2={size.w} y1={y} y2={y} stroke="transparent" strokeWidth={10} {...slBind(id, field, 'stroke')} />
+        <line
+          x1={0}
+          x2={size.w - 70}
+          y1={y}
+          y2={y}
+          stroke={color}
+          strokeWidth={1}
+          strokeDasharray="4 3"
+          style={{ pointerEvents: 'none' }}
+        />
+        <g {...slBind(id, field, 'all')}>
+          <rect x={size.w - 68} y={y - 8} width={64} height={16} rx={2} fill={color} />
+          <text x={size.w - 36} y={y + 4} textAnchor="middle" fontSize={9} fill="#fff" fontFamily="monospace">
+            {field.toUpperCase()} {formatPrice(price, digits)}
+          </text>
+        </g>
+      </g>
+    );
+  };
+
   // ── Drawing interactions (draw mode) ──────────────────────────────
   const onCapturePointerDown = (e: React.PointerEvent) => {
     const p = toData(e.clientX, e.clientY);
@@ -251,6 +339,13 @@ function DrawingLayerImpl({
           className="absolute inset-0"
           style={{ pointerEvents: 'none' }}
         >
+          {activePositions.map((pos) => (
+            <g key={`pos-${pos.id}`}>
+              {pos.sl != null && renderPosLine(pos.id, 'sl', pos.sl, '#ef5350')}
+              {pos.tp != null && renderPosLine(pos.id, 'tp', pos.tp, '#26a69a')}
+            </g>
+          ))}
+
           {drawings.map((d) => (
             <DrawingShape
               key={d.id}

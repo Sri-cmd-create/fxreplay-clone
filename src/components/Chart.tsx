@@ -195,30 +195,7 @@ export function Chart() {
           title: `${isBuy ? 'BUY' : 'SELL'} ${pos.lots}`,
         }),
       );
-      if (pos.sl != null) {
-        priceLinesRef.current.push(
-          series.createPriceLine({
-            price: pos.sl,
-            color: '#ef5350',
-            lineWidth: 1,
-            lineStyle: LineStyle.Dashed,
-            axisLabelVisible: true,
-            title: 'SL',
-          }),
-        );
-      }
-      if (pos.tp != null) {
-        priceLinesRef.current.push(
-          series.createPriceLine({
-            price: pos.tp,
-            color: '#26a69a',
-            lineWidth: 1,
-            lineStyle: LineStyle.Dashed,
-            axisLabelVisible: true,
-            title: 'TP',
-          }),
-        );
-      }
+      // SL / TP are drawn as draggable lines in the DrawingLayer overlay.
 
       markers.push({
         time: snap(pos.entryTime),

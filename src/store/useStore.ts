@@ -26,7 +26,7 @@ const FORWARD_BARS_M1 = 20 * 24 * 60; // ~20 days of 1-minute data
 /** Available playback speeds (bars per second multipliers). */
 export const SPEEDS = [0.5, 1, 2, 5, 10, 25] as const;
 
-const STARTING_BALANCE = 10_000;
+export const STARTING_BALANCE = 10_000;
 
 export interface DerivedAccount {
   floatingPnl: number;
