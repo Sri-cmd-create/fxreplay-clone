@@ -3,6 +3,7 @@ import { INSTRUMENTS, TIMEFRAMES, getInstrument } from '../lib/instruments';
 import { getBaseCandles } from '../lib/data';
 import { formatTime } from '../lib/format';
 import { PlayIcon, PauseIcon, StepIcon, RestartIcon, DiceIcon } from './icons';
+import { ChartSettings } from './ChartSettings';
 
 export function Toolbar() {
   const symbol = useStore((s) => s.symbol);
@@ -147,8 +148,9 @@ export function Toolbar() {
         />
       </div>
 
-      {/* Right side: time display */}
+      {/* Right side: settings + time display */}
       <div className="ml-auto flex items-center gap-2 text-[11px] text-muted">
+        <ChartSettings />
         {atEnd && <span className="text-down font-medium">End of data</span>}
         <span className="rounded bg-panel-alt px-1.5 py-0.5 font-mono text-white">
           {formatTime(currentTime)} UTC

@@ -17,6 +17,7 @@ import { useStore } from '../store/useStore';
 import { getBaseCandles } from '../lib/data';
 import { getInstrument, TIMEFRAME_MAP } from '../lib/instruments';
 import { aggregate } from '../lib/timeframe';
+import { computeIndicator } from '../lib/indicators';
 import type { Candle } from '../types';
 import { DrawingLayer } from './DrawingLayer';
 import { ChartContextMenu } from './ChartContextMenu';
@@ -35,6 +36,7 @@ export function Chart() {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
+  const lineSeriesRefs = useRef<ISeriesApi<'Line'>[]>([]);
   const priceLinesRef = useRef<IPriceLine[]>([]);
   const dataKeyRef = useRef<string>('');
   const prevLenRef = useRef<number>(0);
@@ -48,6 +50,8 @@ export function Chart() {
   const positions = useStore((s) => s.positions);
   const pendingOrders = useStore((s) => s.pendingOrders);
   const history = useStore((s) => s.history);
+  const showGrid = useStore((s) => s.showGrid);
+  const indicators = useStore((s) => s.indicators);
 
   const instrument = getInstrument(symbol);
   const tf = TIMEFRAME_MAP[timeframe];
@@ -147,6 +151,52 @@ export function Chart() {
     }
     prevLenRef.current = visible.length;
   }, [symbol, timeframe, visible, instrument.digits]);
+
+  // ── Grid visibility ───────────────────────────────────────────────
+  useEffect(() => {
+    const chart = chartRef.current;
+    if (!chart) return;
+    const gridColor = showGrid ? 'rgba(30,34,48,0.6)' : 'transparent';
+    chart.applyOptions({
+      grid: {
+        vertLines: { color: gridColor },
+        horzLines: { color: gridColor },
+      },
+    });
+  }, [showGrid]);
+
+  // ── Indicator overlays ────────────────────────────────────────────
+  useEffect(() => {
+    const chart = chartRef.current;
+    if (!chart) return;
+
+    // Remove old line series
+    for (const ls of lineSeriesRefs.current) {
+      chart.removeSeries(ls);
+    }
+    lineSeriesRefs.current = [];
+
+    // Add new ones
+    for (const config of indicators) {
+      const values = computeIndicator(visible, config);
+      const lineData: { time: UTCTimestamp; value: number }[] = [];
+      for (let i = 0; i < visible.length; i++) {
+        const v = values[i];
+        if (v != null) {
+          lineData.push({ time: visible[i].time as UTCTimestamp, value: v });
+        }
+      }
+      const ls = chart.addLineSeries({
+        color: config.color,
+        lineWidth: 1,
+        priceLineVisible: false,
+        lastValueVisible: false,
+        crosshairMarkerVisible: false,
+      });
+      ls.setData(lineData);
+      lineSeriesRefs.current.push(ls);
+    }
+  }, [indicators, visible]);
 
   // ── Position price lines + entry markers ──────────────────────────
   useEffect(() => {

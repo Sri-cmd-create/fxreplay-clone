@@ -71,6 +71,11 @@ interface StoreState {
   drawings: Drawing[];
   selectedDrawingId: string | null;
 
+  // ── Chart settings ─────────────────────────────────────────────────
+  chartStyle: 'candles' | 'hollow' | 'bars' | 'line' | 'area';
+  showGrid: boolean;
+  indicators: import('../lib/indicators').IndicatorConfig[];
+
   // ── Actions ────────────────────────────────────────────────────────
   setSymbol: (symbol: string) => void;
   setTimeframe: (tf: TimeframeCode) => void;
@@ -129,6 +134,12 @@ interface StoreState {
   removeDrawing: (id: string) => void;
   selectDrawing: (id: string | null) => void;
   clearDrawings: () => void;
+
+  // ── Chart settings actions ─────────────────────────────────────────
+  setChartStyle: (style: 'candles' | 'hollow' | 'bars' | 'line' | 'area') => void;
+  toggleGrid: () => void;
+  addIndicator: (config: import('../lib/indicators').IndicatorConfig) => void;
+  removeIndicator: (id: string) => void;
 
   // ── Selectors ──────────────────────────────────────────────────────
   baseCandles: () => Candle[];
@@ -224,6 +235,10 @@ export const useStore = create<StoreState>((set, get) => ({
   drawingColor: saved.drawingColor ?? DRAWING_COLORS[0],
   drawings: saved.drawings ?? [],
   selectedDrawingId: null,
+
+  chartStyle: 'candles',
+  showGrid: true,
+  indicators: [],
 
   setSymbol: (symbol) => {
     const state = get();
@@ -472,6 +487,18 @@ export const useStore = create<StoreState>((set, get) => ({
       selectedDrawingId: null,
     });
   },
+
+  // ── Chart settings actions ─────────────────────────────────────────
+  setChartStyle: (style) => set({ chartStyle: style }),
+  toggleGrid: () => set({ showGrid: !get().showGrid }),
+  addIndicator: (config) => {
+    const { indicators } = get();
+    if (!indicators.some((i) => i.id === config.id)) {
+      set({ indicators: [...indicators, config] });
+    }
+  },
+  removeIndicator: (id) =>
+    set({ indicators: get().indicators.filter((i) => i.id !== id) }),
 
   // ── Selectors ──────────────────────────────────────────────────────
   baseCandles: () => getBaseCandles(getInstrument(get().symbol)),
