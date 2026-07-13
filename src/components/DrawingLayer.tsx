@@ -56,6 +56,9 @@ function DrawingLayerImpl({
   const positions = useStore((s) => s.positions);
   const modifyPosition = useStore((s) => s.modifyPosition);
   const activePositions = positions.filter((p) => p.symbol === symbol);
+  const alerts = useStore((s) => s.alerts);
+  const updateAlert = useStore((s) => s.updateAlert);
+  const activeAlerts = alerts.filter((a) => a.symbol === symbol);
 
   const [size, setSize] = useState({ w: 0, h: 0 });
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -76,6 +79,9 @@ function DrawingLayerImpl({
     field: 'sl' | 'tp';
     pointerId: number;
   } | null>(null);
+
+  // Drag state for price-alert lines.
+  const alertDragRef = useRef<{ id: string; pointerId: number } | null>(null);
 
   const isDrawMode = activeTool !== 'cursor';
 
@@ -294,6 +300,86 @@ function DrawingLayerImpl({
     );
   };
 
+  // ── Dragging price-alert lines ────────────────────────────────────
+  const alertDrag = {
+    begin: (e: React.PointerEvent, id: string) => {
+      e.stopPropagation();
+      alertDragRef.current = { id, pointerId: e.pointerId };
+      try {
+        (e.currentTarget as Element).setPointerCapture(e.pointerId);
+      } catch {
+        /* ignore */
+      }
+    },
+    move: (e: React.PointerEvent) => {
+      const d = alertDragRef.current;
+      if (!d || e.pointerId !== d.pointerId) return;
+      const cur = toData(e.clientX, e.clientY);
+      if (!cur) return;
+      updateAlert(d.id, cur.price);
+    },
+    end: (e: React.PointerEvent) => {
+      const d = alertDragRef.current;
+      if (!d) return;
+      try {
+        (e.currentTarget as Element).releasePointerCapture(d.pointerId);
+      } catch {
+        /* ignore */
+      }
+      alertDragRef.current = null;
+    },
+  };
+
+  const alertBind = (id: string, hit: 'stroke' | 'all') =>
+    isDrawMode
+      ? { style: { pointerEvents: 'none' as const } }
+      : {
+          onPointerDown: (e: React.PointerEvent) => alertDrag.begin(e, id),
+          onPointerMove: alertDrag.move,
+          onPointerUp: alertDrag.end,
+          style: { pointerEvents: hit, cursor: 'ns-resize' } as React.CSSProperties,
+        };
+
+  const renderAlertLine = (id: string, price: number, triggered: boolean) => {
+    const y = mapY(price);
+    if (y == null) return null;
+    const color = triggered ? '#787b86' : '#f0b90b';
+    return (
+      <g key={id}>
+        <line x1={0} x2={size.w} y1={y} y2={y} stroke="transparent" strokeWidth={10} {...alertBind(id, 'stroke')} />
+        <line
+          x1={78}
+          x2={size.w}
+          y1={y}
+          y2={y}
+          stroke={color}
+          strokeWidth={1}
+          strokeDasharray="2 3"
+          style={{ pointerEvents: 'none' }}
+        />
+        <g {...alertBind(id, 'all')}>
+          <rect x={2} y={y - 8} width={76} height={16} rx={2} fill={color} />
+          <path
+            d="M12 5a3 3 0 00-3 3c0 2-.75 2.75-1 3.25h8c-.25-.5-1-1.25-1-3.25a3 3 0 00-3-3zM11 12.5a1 1 0 002 0"
+            transform={`translate(${-4} ${y - 12}) scale(0.7)`}
+            fill={triggered ? '#fff' : '#131722'}
+            style={{ pointerEvents: 'none' }}
+          />
+          <text
+            x={22}
+            y={y + 3}
+            fontSize={9}
+            fill={triggered ? '#fff' : '#131722'}
+            fontFamily="monospace"
+            fontWeight="bold"
+          >
+            {formatPrice(price, digits)}
+          </text>
+        </g>
+      </g>
+    );
+  };
+
   // ── Drawing interactions (draw mode) ──────────────────────────────
   const onCapturePointerDown = (e: React.PointerEvent) => {
     const p = toData(e.clientX, e.clientY);
@@ -347,6 +433,8 @@ function DrawingLayerImpl({
               {pos.tp != null && renderPosLine(pos.id, 'tp', pos.tp, '#26a69a')}
             </g>
           ))}
+
+          {activeAlerts.map((a) => renderAlertLine(a.id, a.price, a.triggered))}
 
           {drawings.map((d) => (
             <DrawingShape

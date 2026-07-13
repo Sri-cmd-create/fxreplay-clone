@@ -162,3 +162,12 @@ export function GearIcon(props: SVGProps<SVGSVGElement>) {
     </svg>
   );
 }
+
+
+export function BellIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M12 2a6 6 0 00-6 6c0 4-1.5 5.5-2 6.5h16c-.5-1-2-2.5-2-6.5a6 6 0 00-6-6zM10 19a2 2 0 004 0" />
+    </svg>
+  );
+}

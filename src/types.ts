@@ -86,6 +86,18 @@ export interface PendingOrder {
   createdTime: number;
 }
 
+/** A price alert that fires once the replay price reaches its level. */
+export interface PriceAlert {
+  id: string;
+  symbol: string;
+  price: number;
+  /** UNIX seconds when the alert was created. */
+  createdTime: number;
+  triggered: boolean;
+  /** UNIX seconds when it fired, or null while still armed. */
+  triggeredTime: number | null;
+}
+
 /** Why a position was closed. */
 export type CloseReason = 'manual' | 'sl' | 'tp';
 

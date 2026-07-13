@@ -132,4 +132,24 @@ assert(useStore.getState().history.length === 0, 'setStartingBalance clears hist
 store.resetAccount();
 assert(useStore.getState().balance === 25000, 'resetAccount uses the configured starting balance');
 
+// 10. Price alerts
+store.setStartingBalance(10000);
+store.restartSession();
+const ap = useStore.getState().currentPrice();
+store.addAlert(ap + eur.pipSize * 10);
+store.addAlert(ap - eur.pipSize * 10);
+assert(useStore.getState().alerts.length === 2, 'two alerts added');
+for (let i = 0; i < 3000 && useStore.getState().alerts.some((a) => !a.triggered); i++) {
+  useStore.getState().stepForward();
+}
+console.log(
+  'alerts triggered:', useStore.getState().alerts.filter((a) => a.triggered).length,
+  'toasts:', useStore.getState().toasts.length,
+);
+assert(
+  useStore.getState().alerts.some((a) => a.triggered),
+  'at least one alert triggered during replay',
+);
+assert(useStore.getState().toasts.length > 0, 'triggering an alert pushes a toast');
+
 console.log('\nALL SMOKE TESTS PASSED');

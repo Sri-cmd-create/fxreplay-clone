@@ -3,14 +3,16 @@ import { useStore } from '../store/useStore';
 import { PositionsPanel } from './PositionsPanel';
 import { PendingPanel } from './PendingPanel';
 import { HistoryPanel } from './HistoryPanel';
+import { AlertsPanel } from './AlertsPanel';
 
-type Tab = 'positions' | 'pending' | 'history';
+type Tab = 'positions' | 'pending' | 'history' | 'alerts';
 
 export function BottomPanel() {
   const [tab, setTab] = useState<Tab>('positions');
   const openCount = useStore((s) => s.positions.length);
   const pendingCount = useStore((s) => s.pendingOrders.length);
   const historyCount = useStore((s) => s.history.length);
+  const alertCount = useStore((s) => s.alerts.length);
 
   return (
     <div className="flex h-full flex-col bg-panel">
@@ -33,11 +35,18 @@ export function BottomPanel() {
           label="History"
           count={historyCount}
         />
+        <TabButton
+          active={tab === 'alerts'}
+          onClick={() => setTab('alerts')}
+          label="Alerts"
+          count={alertCount}
+        />
       </div>
       <div className="min-h-0 flex-1">
         {tab === 'positions' && <PositionsPanel />}
         {tab === 'pending' && <PendingPanel />}
         {tab === 'history' && <HistoryPanel />}
+        {tab === 'alerts' && <AlertsPanel />}
       </div>
     </div>
   );

@@ -4,6 +4,7 @@ import { Chart } from './components/Chart';
 import { OrderPanel } from './components/OrderPanel';
 import { StatsPanel } from './components/StatsPanel';
 import { BottomPanel } from './components/BottomPanel';
+import { Toasts } from './components/Toasts';
 import { useReplayLoop } from './hooks/useReplayLoop';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 
@@ -13,6 +14,7 @@ export default function App() {
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-[#0c0e15]">
+      <Toasts />
       <Toolbar />
       <AccountBar />
 

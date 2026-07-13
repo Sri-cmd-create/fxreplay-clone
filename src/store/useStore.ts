@@ -7,6 +7,7 @@ import type {
   PendingOrder,
   Point,
   Position,
+  PriceAlert,
   Side,
   TimeframeCode,
 } from '../types';
@@ -36,6 +37,13 @@ export interface DerivedAccount {
   marginLevel: number;
 }
 
+/** A transient on-screen notification. */
+export interface Toast {
+  id: string;
+  message: string;
+  tone: 'up' | 'down' | 'info';
+}
+
 interface StoreState {
   // ── Market / replay ────────────────────────────────────────────────
   symbol: string;
@@ -52,6 +60,10 @@ interface StoreState {
   positions: Position[];
   pendingOrders: PendingOrder[];
   history: ClosedTrade[];
+
+  // ── Alerts & notifications ─────────────────────────────────────────
+  alerts: PriceAlert[];
+  toasts: Toast[];
 
   // ── Drawings ───────────────────────────────────────────────────────
   activeTool: DrawingTool;
@@ -101,6 +113,13 @@ interface StoreState {
   cancelOrder: (id: string) => void;
   cancelAllPending: () => void;
   resetAccount: () => void;
+
+  // ── Alert actions ──────────────────────────────────────────────────
+  addAlert: (price: number) => void;
+  removeAlert: (id: string) => void;
+  updateAlert: (id: string, price: number) => void;
+  clearAlerts: () => void;
+  dismissToast: (id: string) => void;
 
   // ── Drawing actions ────────────────────────────────────────────────
   setActiveTool: (tool: DrawingTool) => void;
@@ -159,6 +178,7 @@ type PersistedState = Pick<
   | 'positions'
   | 'pendingOrders'
   | 'history'
+  | 'alerts'
   | 'drawings'
   | 'drawingColor'
 >;
@@ -190,6 +210,9 @@ export const useStore = create<StoreState>((set, get) => ({
   positions: saved.positions ?? [],
   pendingOrders: saved.pendingOrders ?? [],
   history: saved.history ?? [],
+
+  alerts: saved.alerts ?? [],
+  toasts: [],
 
   activeTool: 'cursor',
   drawingColor: saved.drawingColor ?? DRAWING_COLORS[0],
@@ -383,6 +406,35 @@ export const useStore = create<StoreState>((set, get) => ({
     });
   },
 
+  addAlert: (price) => {
+    const { symbol, currentTime, alerts } = get();
+    set({
+      alerts: [
+        ...alerts,
+        {
+          id: nextId('alert'),
+          symbol,
+          price,
+          createdTime: currentTime(),
+          triggered: false,
+          triggeredTime: null,
+        },
+      ],
+    });
+  },
+  removeAlert: (id) =>
+    set({ alerts: get().alerts.filter((a) => a.id !== id) }),
+  // Moving an alert re-arms it.
+  updateAlert: (id, price) =>
+    set({
+      alerts: get().alerts.map((a) =>
+        a.id === id ? { ...a, price, triggered: false, triggeredTime: null } : a,
+      ),
+    }),
+  clearAlerts: () => set({ alerts: get().alerts.filter((a) => !a.triggered) }),
+  dismissToast: (id) =>
+    set({ toasts: get().toasts.filter((t) => t.id !== id) }),
+
   // ── Drawing actions ────────────────────────────────────────────────
   setActiveTool: (tool) =>
     set({ activeTool: tool, selectedDrawingId: null }),
@@ -462,6 +514,7 @@ if (hasStorage) {
         positions: state.positions,
         pendingOrders: state.pendingOrders,
         history: state.history,
+        alerts: state.alerts,
         drawings: state.drawings,
         drawingColor: state.drawingColor,
       };
@@ -533,7 +586,10 @@ function advance(
   let pendingOrders = state.pendingOrders;
   let history = state.history;
   let balance = state.balance;
+  let alerts = state.alerts;
+  let toasts = state.toasts;
   const instrument = getInstrument(symbol);
+  const fmtPrice = (p: number) => p.toFixed(instrument.digits);
 
   for (let i = start + 1; i <= end; i++) {
     const candle = candles[i];
@@ -594,6 +650,32 @@ function advance(
       }
     }
     positions = remaining;
+
+    // 3. Fire any armed price alerts whose level is inside this candle.
+    if (alerts.some((a) => a.symbol === symbol && !a.triggered)) {
+      let changed = false;
+      const next = alerts.map((a) => {
+        if (
+          a.symbol === symbol &&
+          !a.triggered &&
+          candle.low <= a.price &&
+          candle.high >= a.price
+        ) {
+          changed = true;
+          toasts = [
+            ...toasts,
+            {
+              id: nextId('toast'),
+              message: `${symbol} reached ${fmtPrice(a.price)}`,
+              tone: 'info' as const,
+            },
+          ].slice(-5);
+          return { ...a, triggered: true, triggeredTime: candle.time };
+        }
+        return a;
+      });
+      if (changed) alerts = next;
+    }
   }
 
   set({
@@ -602,6 +684,8 @@ function advance(
     pendingOrders,
     history,
     balance,
+    alerts,
+    toasts,
     playing: end >= candles.length - 1 ? false : state.playing,
   });
 }
