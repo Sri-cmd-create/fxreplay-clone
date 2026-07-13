@@ -130,7 +130,7 @@ function EquityCurve({
 
   const last = equity[equity.length - 1];
   const up = last >= startBalance;
-  const color = up ? '#26a69a' : '#ef5350';
+  const color = up ? '#22c55e' : '#ef4444';
 
   const W = 100;
   const H = 32;
@@ -168,7 +168,7 @@ function EquityCurve({
           x2={W}
           y1={baselineY}
           y2={baselineY}
-          stroke="#2a2e39"
+          stroke="#1e2230"
           strokeWidth={0.5}
           strokeDasharray="2 2"
         />

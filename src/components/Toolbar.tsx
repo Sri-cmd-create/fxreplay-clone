@@ -37,24 +37,24 @@ export function Toolbar() {
   const curDate = toISODate(currentTime);
 
   return (
-    <div className="flex items-center gap-3 border-b border-border bg-panel px-3 py-2">
-      {/* Brand */}
-      <div className="flex items-center gap-2 pr-2">
-        <div className="flex h-6 w-6 items-center justify-center rounded bg-accent text-xs font-bold text-white">
+    <div className="flex h-9 items-center gap-2 border-b border-border bg-panel px-2">
+      {/* Brand - compact */}
+      <div className="flex items-center gap-1.5">
+        <div className="flex h-5 w-5 items-center justify-center rounded bg-accent text-[9px] font-bold text-white">
           FX
         </div>
-        <span className="hidden text-sm font-semibold tracking-wide text-white sm:inline">
+        <span className="hidden text-xs font-semibold tracking-wide text-white sm:inline">
           Replay<span className="text-accent">Pro</span>
         </span>
       </div>
 
-      <div className="h-5 w-px bg-border" />
+      <div className="h-4 w-px bg-border" />
 
-      {/* Symbol */}
+      {/* Symbol selector */}
       <select
         value={symbol}
         onChange={(e) => setSymbol(e.target.value)}
-        className="rounded bg-panel-alt px-2 py-1 text-sm font-semibold text-white outline-none ring-1 ring-border hover:bg-panel-hover focus:ring-accent"
+        className="rounded bg-panel-alt px-1.5 py-0.5 text-xs font-semibold text-white outline-none ring-1 ring-border hover:bg-panel-hover focus:ring-accent"
       >
         {INSTRUMENTS.map((i) => (
           <option key={i.symbol} value={i.symbol}>
@@ -64,12 +64,12 @@ export function Toolbar() {
       </select>
 
       {/* Timeframes */}
-      <div className="flex items-center gap-0.5 rounded bg-panel-alt p-0.5">
+      <div className="flex items-center gap-px rounded bg-panel-alt p-px">
         {TIMEFRAMES.map((tf) => (
           <button
             key={tf.code}
             onClick={() => setTimeframe(tf.code)}
-            className={`rounded px-2 py-1 text-xs font-medium transition-colors ${
+            className={`rounded px-1.5 py-0.5 text-[11px] font-medium transition-colors ${
               timeframe === tf.code
                 ? 'bg-accent text-white'
                 : 'text-muted hover:bg-panel-hover hover:text-white'
@@ -80,14 +80,14 @@ export function Toolbar() {
         ))}
       </div>
 
-      <div className="h-5 w-px bg-border" />
+      <div className="h-4 w-px bg-border" />
 
-      {/* Replay controls */}
-      <div className="flex items-center gap-1">
+      {/* Replay controls - centered group */}
+      <div className="flex items-center gap-0.5">
         <button
           title="Restart session"
           onClick={restartSession}
-          className="rounded p-1.5 text-muted hover:bg-panel-hover hover:text-white"
+          className="rounded p-1 text-muted hover:bg-panel-hover hover:text-white"
         >
           <RestartIcon />
         </button>
@@ -95,15 +95,15 @@ export function Toolbar() {
           title={playing ? 'Pause (Space)' : 'Play (Space)'}
           onClick={togglePlay}
           disabled={atEnd}
-          className="rounded bg-accent p-1.5 text-white hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
+          className="rounded bg-accent p-1 text-white hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
         >
           {playing ? <PauseIcon /> : <PlayIcon />}
         </button>
         <button
-          title="Step forward one bar (→)"
+          title="Step forward one bar"
           onClick={stepForward}
           disabled={atEnd}
-          className="rounded p-1.5 text-muted hover:bg-panel-hover hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+          className="rounded p-1 text-muted hover:bg-panel-hover hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
         >
           <StepIcon />
         </button>
@@ -111,8 +111,8 @@ export function Toolbar() {
         <select
           value={speed}
           onChange={(e) => setSpeed(Number(e.target.value))}
-          title="Playback speed (bars per second)"
-          className="ml-1 rounded bg-panel-alt px-2 py-1 text-xs text-white outline-none ring-1 ring-border hover:bg-panel-hover focus:ring-accent"
+          title="Playback speed"
+          className="ml-0.5 rounded bg-panel-alt px-1.5 py-0.5 text-[11px] text-white outline-none ring-1 ring-border hover:bg-panel-hover focus:ring-accent"
         >
           {SPEEDS.map((s) => (
             <option key={s} value={s}>
@@ -122,14 +122,14 @@ export function Toolbar() {
         </select>
       </div>
 
-      <div className="h-5 w-px bg-border" />
+      <div className="h-4 w-px bg-border" />
 
-      {/* Session start controls */}
-      <div className="flex items-center gap-1">
+      {/* Random + date jump */}
+      <div className="flex items-center gap-0.5">
         <button
-          title="Jump to a random start date (new session)"
+          title="Random start date"
           onClick={randomStart}
-          className="rounded p-1.5 text-muted hover:bg-panel-hover hover:text-white"
+          className="rounded p-1 text-muted hover:bg-panel-hover hover:text-white"
         >
           <DiceIcon />
         </button>
@@ -138,18 +138,19 @@ export function Toolbar() {
           value={curDate}
           min={minDate}
           max={maxDate}
-          title="Jump to a specific date (new session)"
+          title="Jump to date"
           onChange={(e) => {
             const secs = Date.parse(`${e.target.value}T00:00:00Z`) / 1000;
             if (!Number.isNaN(secs)) jumpToTime(secs);
           }}
-          className="rounded bg-panel-alt px-2 py-1 text-xs text-white outline-none ring-1 ring-border hover:bg-panel-hover focus:ring-accent [color-scheme:dark]"
+          className="rounded bg-panel-alt px-1.5 py-0.5 text-[11px] text-white outline-none ring-1 ring-border hover:bg-panel-hover focus:ring-accent [color-scheme:dark]"
         />
       </div>
 
-      <div className="ml-auto flex items-center gap-2 text-xs text-muted">
-        {atEnd && <span className="text-down">End of data</span>}
-        <span className="rounded bg-panel-alt px-2 py-1 font-mono text-white">
+      {/* Right side: time display */}
+      <div className="ml-auto flex items-center gap-2 text-[11px] text-muted">
+        {atEnd && <span className="text-down font-medium">End of data</span>}
+        <span className="rounded bg-panel-alt px-1.5 py-0.5 font-mono text-white">
           {formatTime(currentTime)} UTC
         </span>
       </div>

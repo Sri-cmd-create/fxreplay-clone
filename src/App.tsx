@@ -1,10 +1,8 @@
 import { useCallback, useRef, useState } from 'react';
 import { Toolbar } from './components/Toolbar';
-import { AccountBar } from './components/AccountBar';
 import { Chart } from './components/Chart';
-import { Watchlist } from './components/Watchlist';
+import { DrawingToolbar } from './components/DrawingToolbar';
 import { OrderPanel } from './components/OrderPanel';
-import { StatsPanel } from './components/StatsPanel';
 import { BottomPanel } from './components/BottomPanel';
 import { Toasts } from './components/Toasts';
 import { useReplayLoop } from './hooks/useReplayLoop';
@@ -14,7 +12,7 @@ export default function App() {
   useReplayLoop();
   useKeyboardShortcuts();
 
-  const [bottomH, setBottomH] = useState(224);
+  const [bottomH, setBottomH] = useState(180);
   const dragRef = useRef<{ startY: number; startH: number } | null>(null);
 
   const onDragStart = useCallback(
@@ -36,25 +34,24 @@ export default function App() {
   }, []);
 
   return (
-    <div className="flex h-screen flex-col overflow-hidden bg-[#0c0e15]">
+    <div className="flex h-screen flex-col overflow-hidden bg-[#0a0e17]">
       <Toasts />
+      {/* Top toolbar - single thin row */}
       <Toolbar />
-      <AccountBar />
 
+      {/* Main area: drawing strip | chart | order panel */}
       <div className="flex min-h-0 flex-1">
-        {/* Left sidebar: watchlist */}
-        <aside className="flex w-52 shrink-0 flex-col overflow-y-auto border-r border-border bg-panel">
-          <Watchlist />
-        </aside>
+        {/* Left: thin drawing tools strip */}
+        <DrawingToolbar />
 
-        {/* Chart + bottom panel */}
+        {/* Center: chart + bottom panel */}
         <div className="flex min-w-0 flex-1 flex-col">
-          <div className="min-h-0 flex-1 border-b border-border">
+          <div className="min-h-0 flex-1">
             <Chart />
           </div>
           {/* Drag divider */}
           <div
-            className="h-1 shrink-0 cursor-row-resize bg-border hover:bg-accent active:bg-accent"
+            className="h-[3px] shrink-0 cursor-row-resize bg-border/50 hover:bg-accent/60 active:bg-accent"
             onPointerDown={onDragStart}
             onPointerMove={onDragMove}
             onPointerUp={onDragEnd}
@@ -64,10 +61,9 @@ export default function App() {
           </div>
         </div>
 
-        {/* Right sidebar: order ticket + performance */}
-        <aside className="flex w-72 shrink-0 flex-col overflow-y-auto border-l border-border bg-panel">
+        {/* Right: compact order panel */}
+        <aside className="flex w-60 shrink-0 flex-col overflow-y-auto border-l border-border bg-panel">
           <OrderPanel />
-          <StatsPanel />
         </aside>
       </div>
     </div>

@@ -4,16 +4,16 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Trading terminal palette
-        panel: '#131722',
-        'panel-alt': '#1e222d',
-        'panel-hover': '#2a2e39',
-        border: '#2a2e39',
-        muted: '#787b86',
-        up: '#26a69a',
-        'up-soft': 'rgba(38,166,154,0.15)',
-        down: '#ef5350',
-        'down-soft': 'rgba(239,83,80,0.15)',
+        // FXReplay Pro dark palette
+        panel: '#0f1118',
+        'panel-alt': '#161a25',
+        'panel-hover': '#1e2230',
+        border: '#1e2230',
+        muted: '#6b6f7b',
+        up: '#22c55e',
+        'up-soft': 'rgba(34,197,94,0.12)',
+        down: '#ef4444',
+        'down-soft': 'rgba(239,68,68,0.12)',
         accent: '#2962ff',
       },
       fontFamily: {

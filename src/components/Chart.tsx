@@ -18,7 +18,6 @@ import { getBaseCandles } from '../lib/data';
 import { getInstrument, TIMEFRAME_MAP } from '../lib/instruments';
 import { aggregate } from '../lib/timeframe';
 import type { Candle } from '../types';
-import { DrawingToolbar } from './DrawingToolbar';
 import { DrawingLayer } from './DrawingLayer';
 import { ChartContextMenu } from './ChartContextMenu';
 
@@ -68,30 +67,30 @@ export function Chart() {
     const chart = createChart(container, {
       autoSize: true,
       layout: {
-        background: { type: ColorType.Solid, color: '#131722' },
+        background: { type: ColorType.Solid, color: '#0f1118' },
         textColor: '#d1d4dc',
         fontFamily:
           'ui-monospace, SFMono-Regular, Menlo, Monaco, monospace',
       },
       grid: {
-        vertLines: { color: 'rgba(42,46,57,0.5)' },
-        horzLines: { color: 'rgba(42,46,57,0.5)' },
+        vertLines: { color: 'rgba(30,34,48,0.6)' },
+        horzLines: { color: 'rgba(30,34,48,0.6)' },
       },
       crosshair: { mode: CrosshairMode.Normal },
-      rightPriceScale: { borderColor: '#2a2e39' },
+      rightPriceScale: { borderColor: '#1e2230' },
       timeScale: {
-        borderColor: '#2a2e39',
+        borderColor: '#1e2230',
         timeVisible: true,
         secondsVisible: false,
       },
     });
 
     const series = chart.addCandlestickSeries({
-      upColor: '#26a69a',
-      downColor: '#ef5350',
+      upColor: '#22c55e',
+      downColor: '#ef4444',
       borderVisible: false,
-      wickUpColor: '#26a69a',
-      wickDownColor: '#ef5350',
+      wickUpColor: '#22c55e',
+      wickDownColor: '#ef4444',
     });
 
     chartRef.current = chart;
@@ -177,7 +176,7 @@ export function Chart() {
       markers.push({
         time: snap(t.exitTime),
         position: isBuy ? 'aboveBar' : 'belowBar',
-        color: win ? '#26a69a' : '#ef5350',
+        color: win ? '#22c55e' : '#ef4444',
         shape: 'circle',
         text: t.reason === 'tp' ? 'TP' : t.reason === 'sl' ? 'SL' : 'Close',
       });
@@ -190,7 +189,7 @@ export function Chart() {
       priceLinesRef.current.push(
         series.createPriceLine({
           price: pos.entryPrice,
-          color: isBuy ? '#26a69a' : '#ef5350',
+          color: isBuy ? '#22c55e' : '#ef4444',
           lineWidth: 1,
           lineStyle: LineStyle.Solid,
           axisLabelVisible: true,
@@ -202,7 +201,7 @@ export function Chart() {
       markers.push({
         time: snap(pos.entryTime),
         position: isBuy ? 'belowBar' : 'aboveBar',
-        color: isBuy ? '#26a69a' : '#ef5350',
+        color: isBuy ? '#22c55e' : '#ef4444',
         shape: isBuy ? 'arrowUp' : 'arrowDown',
         text: isBuy ? 'Buy' : 'Sell',
       });
@@ -215,7 +214,7 @@ export function Chart() {
       priceLinesRef.current.push(
         series.createPriceLine({
           price: o.price,
-          color: isBuy ? '#26a69a' : '#ef5350',
+          color: isBuy ? '#22c55e' : '#ef4444',
           lineWidth: 1,
           lineStyle: LineStyle.Dotted,
           axisLabelVisible: true,
@@ -226,7 +225,7 @@ export function Chart() {
         priceLinesRef.current.push(
           series.createPriceLine({
             price: o.sl,
-            color: '#ef5350',
+            color: '#ef4444',
             lineWidth: 1,
             lineStyle: LineStyle.Dotted,
             axisLabelVisible: false,
@@ -238,7 +237,7 @@ export function Chart() {
         priceLinesRef.current.push(
           series.createPriceLine({
             price: o.tp,
-            color: '#26a69a',
+            color: '#22c55e',
             lineWidth: 1,
             lineStyle: LineStyle.Dotted,
             axisLabelVisible: false,
@@ -257,7 +256,6 @@ export function Chart() {
 
   return (
     <div className="flex h-full w-full">
-      <DrawingToolbar />
       <div
         className="relative min-w-0 flex-1"
         onContextMenu={(e) => {
@@ -353,7 +351,7 @@ function ChartLegend({
   if (!bar) return null;
 
   const up = bar.close >= bar.open;
-  const color = up ? '#26a69a' : '#ef5350';
+  const color = up ? '#22c55e' : '#ef4444';
   const change = bar.close - bar.open;
   const pct = bar.open ? (change / bar.open) * 100 : 0;
   const fmt = (v: number) =>

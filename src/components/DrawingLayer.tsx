@@ -429,8 +429,8 @@ function DrawingLayerImpl({
         >
           {activePositions.map((pos) => (
             <g key={`pos-${pos.id}`}>
-              {pos.sl != null && renderPosLine(pos.id, 'sl', pos.sl, '#ef5350')}
-              {pos.tp != null && renderPosLine(pos.id, 'tp', pos.tp, '#26a69a')}
+              {pos.sl != null && renderPosLine(pos.id, 'sl', pos.sl, '#ef4444')}
+              {pos.tp != null && renderPosLine(pos.id, 'tp', pos.tp, '#22c55e')}
             </g>
           ))}
 
@@ -637,7 +637,7 @@ function DrawingShape({
     const pct = p0.price !== 0 ? (priceDelta / p0.price) * 100 : 0;
     const bars = Math.round(Math.abs(p1.time - p0.time) / tfSeconds);
     const up = priceDelta >= 0;
-    const mColor = up ? '#26a69a' : '#ef5350';
+    const mColor = up ? '#22c55e' : '#ef4444';
     const dir = y1 < y0 ? -1 : 1;
     return (
       <g>
@@ -757,7 +757,7 @@ function DeleteBadge({
         onDelete();
       }}
     >
-      <circle cx={x} cy={y} r={8} fill="#ef5350" />
+      <circle cx={x} cy={y} r={8} fill="#ef4444" />
       <path
         d="M-3 -3 L3 3 M3 -3 L-3 3"
         transform={`translate(${x} ${y})`}

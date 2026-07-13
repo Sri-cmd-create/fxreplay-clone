@@ -31,32 +31,32 @@ export function DrawingToolbar() {
   );
 
   return (
-    <div className="flex w-10 shrink-0 flex-col items-center gap-1 border-r border-border bg-panel py-2">
+    <div className="flex w-9 shrink-0 flex-col items-center gap-0.5 border-r border-border bg-panel py-1.5">
       {TOOLS.map(({ tool, label, Icon }) => (
         <button
           key={tool}
           title={label}
           onClick={() => setActiveTool(tool)}
-          className={`flex h-8 w-8 items-center justify-center rounded transition-colors ${
+          className={`flex h-7 w-7 items-center justify-center rounded transition-colors ${
             activeTool === tool
               ? 'bg-accent text-white'
               : 'text-muted hover:bg-panel-hover hover:text-white'
           }`}
         >
-          <Icon width={18} height={18} />
+          <Icon width={16} height={16} />
         </button>
       ))}
 
-      <div className="my-1 h-px w-6 bg-border" />
+      <div className="my-0.5 h-px w-5 bg-border" />
 
       {/* Colour palette */}
-      <div className="flex flex-col items-center gap-1">
+      <div className="flex flex-col items-center gap-0.5">
         {DRAWING_COLORS.map((c) => (
           <button
             key={c}
             title={`Colour ${c}`}
             onClick={() => setDrawingColor(c)}
-            className={`h-4 w-4 rounded-full ring-offset-1 ring-offset-panel ${
+            className={`h-3.5 w-3.5 rounded-full ring-offset-1 ring-offset-panel ${
               drawingColor === c ? 'ring-2 ring-white' : ''
             }`}
             style={{ backgroundColor: c }}
@@ -64,15 +64,15 @@ export function DrawingToolbar() {
         ))}
       </div>
 
-      <div className="my-1 h-px w-6 bg-border" />
+      <div className="my-0.5 h-px w-5 bg-border" />
 
       <button
         title="Clear all drawings on this symbol"
         onClick={clearDrawings}
         disabled={!hasDrawings}
-        className="flex h-8 w-8 items-center justify-center rounded text-muted hover:bg-down hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
+        className="flex h-7 w-7 items-center justify-center rounded text-muted hover:bg-down hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
       >
-        <TrashIcon width={16} height={16} />
+        <TrashIcon width={14} height={14} />
       </button>
     </div>
   );
